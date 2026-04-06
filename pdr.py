@@ -164,6 +164,11 @@ class PDR:
         if hint_lemmas:
             from llm_oracle import verify_and_inject
             verify_and_inject(self, hint_lemmas, verbose=self.silent)
+
+        # LLM callback for on-the-fly hint generation (set externally)
+        self._llm_callback = None
+        self._llm_call_count = 0
+        self._last_llm_frame = 0
         
         try:
             if not self.silent:
@@ -230,6 +235,13 @@ class PDR:
 
                         for idx in range(1, len(self.frames) - 1):
                             self.propagate(idx)
+
+                        # LLM intervention: when a new frame is created, ask LLM
+                        # for targeted hints based on current proof state
+                        if self._llm_callback and len(self.frames) > self._last_llm_frame + 1:
+                            self._last_llm_frame = len(self.frames)
+                            self._ask_llm_for_hints()
+
                     end_time = time.time()
                     self.overall_runtime += end_time - start_time
         except KeyboardInterrupt:
@@ -587,6 +599,34 @@ class PDR:
                 reverse=True,
             )
         #return list(range(len(cubeLiterals)))
+
+    def _ask_llm_for_hints(self):
+        """Ask LLM for targeted hints based on current IC3 proof state."""
+        if not self._llm_callback:
+            return
+        # Collect proof state: frame count, lemma counts, recent lemmas
+        frame_info = {
+            "num_frames": len(self.frames),
+            "lemmas_per_frame": [len(f.Lemma) for f in self.frames],
+            "total_sat_calls": self.sum_of_sat_call,
+            "push_rate": f"{self.successful_pushes}/{self.total_push_attempts}",
+        }
+        # Extract sample lemmas from the latest non-empty frame for context
+        latest_lemmas = []
+        for f in reversed(self.frames[1:]):
+            if len(f.Lemma) > 0:
+                for lem in f.Lemma[-5:]:  # last 5 lemmas
+                    latest_lemmas.append(str(lem)[:200])
+                break
+
+        new_hints = self._llm_callback(frame_info, latest_lemmas)
+        if not new_hints:
+            return
+
+        self._llm_call_count += 1
+        # Verify and inject new hints into all frames >= 1
+        from llm_oracle import verify_and_inject
+        verify_and_inject(self, new_hints, verbose=True)
 
     def strengthen(self):
         self.status = "OVER-APPROXIMATING" 

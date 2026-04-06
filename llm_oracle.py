@@ -260,44 +260,36 @@ class PredicateEncoder:
 # 3. LLM Oracle: calls LLM to generate invariant hints
 # ─────────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are a formal verification expert specializing in hardware model checking.
-Your task: given a Verilog module and its safety property, generate INDIVIDUALLY
-INDUCTIVE invariant predicates that help an IC3/PDR model checker prove the property.
+SYSTEM_PROMPT = """You are a formal verification expert specializing in IC3/PDR model checking.
+Your task: generate invariant CLAUSES that help IC3 prove a safety property.
 
-CRITICAL REQUIREMENT: Each hint must be INDIVIDUALLY relatively-inductive, meaning:
-  If the hint AND the safety property both hold in some state,
-  then after ONE transition step, the hint STILL holds.
-  Formally: hint ∧ Post ∧ T → hint'
+IC3 works with clauses (disjunctions) in each frame. A clause propagates from frame F_i
+to F_{i+1} if: F_i ∧ T ∧ ¬clause' is UNSAT. Weak clauses get stuck and don't propagate.
 
-A simple predicate like Not(And(a, b)) is usually NOT individually inductive because
-the solver cannot rule out both a and b becoming true in one step. To make it inductive,
-you must COMBINE it with the conditions that prevent the violation. For example:
-  - Instead of Not(And(held_0, held_1)),
-    write Implies(And(held_0, held_1), word_eq("ep_0", "ep_1"))
-    which is inductive because the protocol guarantees distinct epochs.
-  - Or write Implies(held_0, Or(word_eq_zero("transfer_0"), ...))
-    tying the state to transition guards.
+KEY PRINCIPLE: Each clause must be SELF-SUSTAINING. Combine the invariant predicate with
+the REASON it is preserved. Use Or/Implies to pack multiple conditions into one clause.
 
-Think step by step:
-1. What is the key protocol mechanism that maintains safety?
-2. For each invariant, WHY is it preserved by every possible transition?
-3. Does each hint contain enough context to be self-sustaining?
+BAD (too weak, won't propagate):
+  Not(And(held_0, held_1))     # bare mutex, nothing explains WHY
 
-Output ONLY a Python list named `hints`. Use these APIs:
-- bool_var("name") → 1-bit Verilog variable as Z3 Bool
-- bit_var("name", idx) → specific bit of multi-bit var (e.g., bit_var("nitems", 2))
-- word_eq_zero("name") → multi-bit var == 0
-- word_neq_zero("name") → multi-bit var != 0
-- word_eq("a", "b") → two multi-bit vars are equal
-- word_neq("a", "b") → two multi-bit vars differ
-- word_lt("a", "b") → unsigned a < b
-- word_gt("a", "b") → unsigned a > b
-- word_le("a", "b") / word_ge("a", "b") → unsigned ≤ / ≥
-- Z3 operators: And, Or, Not, Implies
+GOOD (self-sustaining, will propagate):
+  Or(Not(held_0), Not(held_1), word_eq("ep_0", "ep_1"))
+  # "if both hold, epochs must be equal" — the epoch mechanism is baked in,
+  # so IC3 can prove this clause is preserved by the transition.
 
-For 1-bit variables, you can use the name directly (e.g., `held_0` instead of `bool_var("held_0")`).
-IMPORTANT: use variable names exactly as shown in the symbol table. Do NOT use array slices.
-Prefer STRONG composite predicates over many weak simple ones."""
+  Implies(held_0, And(word_neq_zero("ep_0"), word_gt("ep_0", word_...")))
+  # ties held to epoch ordering — the transition guard is embedded.
+
+Think: for each clause, what transition could violate it? Add conditions that
+rule out that transition. The clause should contain its own "proof sketch".
+
+Output ONLY `hints = [...]`. Use these APIs:
+- bool_var("name") / bit_var("name", idx)
+- word_eq_zero / word_neq_zero / word_eq / word_neq
+- word_lt / word_gt / word_le / word_ge  (unsigned comparison)
+- Z3: And, Or, Not, Implies
+
+1-bit vars can be used directly by name. Do NOT use array slices like var[2:0]."""
 
 
 def build_user_prompt(verilog_source, property_desc, symbol_summary):
