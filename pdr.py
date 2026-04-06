@@ -150,7 +150,7 @@ class PDR:
                 filtered_trans.append(self.trans.cubeLiterals[idx])
         return And(filtered_trans)
 
-    def run(self):
+    def run(self, hint_lemmas=None):
         if not self.check_init():
             if self.silent:
                 print("Found trace ending in bad state")
@@ -159,6 +159,11 @@ class PDR:
             return False
 
         self.frames = [Frame(lemmas=[self.init.cube()]), Frame(lemmas=[self.post.cube()])]
+
+        # Inject LLM-generated hint lemmas into frame 1
+        if hint_lemmas:
+            from llm_oracle import verify_and_inject
+            verify_and_inject(self, hint_lemmas, verbose=self.silent)
         
         try:
             if not self.silent:
