@@ -146,7 +146,7 @@ Hints that fail either check are discarded. Verified hints are injected as lemma
 | #   | Benchmark             | Generated | Injected | Vanilla               | W/Hints                   | dFrames | dTime      | dSAT     |
 | --- | --------------------- | --------- | -------- | --------------------- | ------------------------- | ------- | ---------- | -------- |
 | 1   | client_server         | 15        | 15       | 0.044s / 3F / 51sat   | 0.024s / 3F / 37sat       | 0       | **-45%**   | -27%     |
-| 2   | toy_lock_4            | 28        | 28       | T/O / 4F / 32344sat   | T/O / 4F / 27525sat       | 0       | -          | -15%     |
+| 2   | toy_lock_4            | 28        | **0**    | T/O / 4F / 15315sat   | T/O / 4F / 14676sat       | 0       | -          | -4%      |
 | 3   | h_Dekker              | 8         | 8        | 0.86s / 8F / 455sat   | 0.48s / 7F / 346sat       | **-1**  | **-44%**   | -24%     |
 | 4   | h_Arbiter             | 0         | 0        | 0.10s / 3F / 85sat    | 0.10s / 3F / 85sat        | 0       | 0          | 0        |
 | 5   | **h_TreeArb**         | 19        | **9**    | 124s / 15F / 18571sat | **34.5s / 10F / 7210sat** | **-5**  | **-72%**   | **-61%** |
@@ -154,7 +154,7 @@ Hints that fail either check are discarded. Verified hints are injected as lemma
 | 7   | cache_coherence_three | 12        | 12       | 2.02s / 6F / 578sat   | 1.93s / 4F / 531sat       | **-2**  | -5%        | -8%      |
 | 8   | sw_state_machine      | 11        | **7**    | 0.53s / 5F / 149sat   | 0.55s / 5F / 192sat       | 0       | +4%        | +29%     |
 | 9   | h_Vending             | 10        | 10       | 16.1s / 15F / 4029sat | 12.2s / 13F / 2935sat     | **-2**  | **-24%**   | -27%     |
-| 10  | Heap                  | 15        | 15       | T/O / 22F / 56202sat  | ERROR                     | -       | -          | -        |
+| 10  | Heap                  | 13        | **5**    | T/O / 18F / 30699sat  | T/O / 17F / 32865sat      | **-1**  | -          | +7%      |
 | 11  | **h_CRC**             | 3         | 3        | 38.5s / 4F / 10247sat | **0.95s / 4F / 287sat**   | 0       | **-97.5%** | **-97%** |
 | 12  | h_FIFO                | 21        | 21       | 6.33s / 5F / 1413sat  | 4.96s / 5F / 1215sat      | 0       | **-22%**   | -14%     |
 
@@ -164,14 +164,31 @@ Hints that fail either check are discarded. Verified hints are injected as lemma
 **Key findings**:
 
 - **9/10 benchmarks with hints improved or held steady** (no degradation). The Tier 2 relative-inductiveness filter eliminated all regressions from incorrect hints.
-- **4 benchmarks with frame reduction**: h_TreeArb (15->10), h_Dekker (8->7), cache_coherence_three (6->4), h_Vending (15->13).
+- **5 benchmarks with frame reduction**: h_TreeArb (15->10), h_Dekker (8->7), cache_coherence_three (6->4), h_Vending (15->13), Heap (18->17).
 - **Best speedup: h_CRC 40x** (38.5s -> 0.95s). This is an unsafe case — LLM hints prune the counterexample search space, reducing SAT calls from 10247 to 287.
 - **Tier 2 filter impact**: On h_TreeArb, 10/19 LLM-generated hints were rejected as non-relatively-inductive. Without the filter, these bad hints caused a +27% slowdown; with the filter, the same benchmark achieved a **72% speedup and 5 fewer frames**. On sw_state_machine, 4/11 hints were rejected, turning a +97% slowdown into a neutral result (+4%).
 
+**Timeout case analysis** (120s cutoff, Tier 3 → Tier 2 fallback, detailed profiling):
+
+| Metric | toy_lock_4 Vanilla | toy_lock_4 W/Hints | Heap Vanilla | Heap W/Hints |
+|---|---|---|---|---|
+| Frames reached | 4 | 4 | 17 | **16 (-1)** |
+| Hints generated / injected | - | 32 / **11** | - | 9 / **4** |
+| Lemmas in F1 | 285 | 282 | 355 | 371 (+16) |
+| **Lemmas in deepest F** | **9** | **19 (+10)** | 37 | 38 |
+| SAT calls | 14413 | 14057 (**-2.5%**) | 28915 | 30525 (+5.6%) |
+| Push success rate | 72/10060 (0.7%) | **94/8406 (1.1%)** | 906/11782 (7.7%) | 879/12229 (7.2%) |
+| Propagate time | 70.7s (59%) | **64.5s (54%)** | 60.0s (50%) | 59.1s (49%) |
+| MIC time | 22.3s (19%) | 29.0s (24%) | 41.1s (34%) | 42.4s (35%) |
+
+- **toy_lock_4**: Tier 3 failed (joint conjunction not inductive due to 1 bad hint + some non-inductive ones mixed in), Tier 2 fallback kept 11/32 hints. Frame count unchanged (both stuck at 4), but the deepest frame accumulated **more lemmas** (9→19) — hints helped IC3 discover more valid blocking clauses within the current frame. Push success rate improved 57% (0.7%→1.1%), and propagate time dropped 8.8%. The 6 mutual-exclusion predicates were rejected by Tier 2 (not individually inductive); these would require a cleaner Tier 3 pass (filtering the 1 init-violating hint first, then re-checking the rest as a group).
+- **Heap**: 4/9 hints injected, frame reached 16 vs 17 (**-1 frame**). SAT calls increased 5.6% due to extra lemmas adding propagation overhead. Heap likely needs 20+ frames to converge; at the current rate, ~30 more seconds would suffice with hints (vs ~40 without).
+
 **Open problems**:
 
-1. **toy_lock_4 and Heap still timeout**: 100 latches (toy_lock_4) and 24 latches with 79 inputs (Heap) create transition relations too large for Z3's per-SAT-call performance. Hints reduce SAT call count but cannot compensate for the fundamental overhead of Z3 on propositional formulas. Using a dedicated SAT solver (Kissat/CaDiCaL) as backend would likely resolve this.
-2. **Variable name resolution**: LLM-generated variable references sometimes use hierarchical names (`pcacheA.state`), Verilog macros (`K2`), or double-indexed patterns (`pc[0][2:0]`) that don't match the flat AIGER symbol table. A progressive bracket-stripping fallback and per-hint error recovery partially address this, but 2/12 benchmarks (h_Arbiter, cache_coherence_two) still fail to generate any valid hints.
+1. **Tier 3 joint-inductiveness is implemented but fragile**: The current strategy tries Tier 3 (all hints as a conjunction) first, then falls back to Tier 2 (individual). On toy_lock_4, Tier 3 fails because the batch includes 1 init-violating hint and several non-inductive ones — the conjunction is polluted. A more robust approach would: (a) filter init-violating hints first, (b) then try Tier 3 on the clean subset, (c) if still fails, iteratively remove hints to find the maximal jointly-inductive subset.
+2. **Z3 per-call overhead on large circuits**: toy_lock_4 (100 latches, 1046 ANDs) and Heap (24 latches, 654 ANDs) remain fundamentally limited by Z3's performance on propositional SAT. Replacing Z3 with a dedicated CDCL solver (Kissat/CaDiCaL) would likely resolve both timeouts.
+3. **Variable name resolution**: LLM-generated references sometimes use hierarchical names (`pcacheA.state`), Verilog macros (`K2`), or double-indexed patterns (`pc[0][2:0]`). Fallback parsing and per-hint error recovery handle most cases, but 2/12 benchmarks (h_Arbiter, cache_coherence_two) still produce 0 valid hints.
 
 ## Benchmark Source Paths
 

@@ -408,14 +408,17 @@ def _extract_code_block(text):
 def verify_and_inject(pdr_instance, hints, verbose=True):
     """Verify hints and inject into IC3 frames.
 
-    Two-tier filter before injection:
-      Tier 0: Init ∧ ¬hint is UNSAT          (hint holds in initial state)
-      Tier 2: hint ∧ Post ∧ T ∧ ¬hint' is UNSAT  (relatively inductive w.r.t. property)
+    Strategy: Tier 0 (init check) → Tier 3 (joint) → fallback Tier 2 (individual).
 
-    Args:
-        pdr_instance: PDR solver (after frames are initialized)
-        hints: list of Z3 Bool expressions (clauses that should always hold)
-        verbose: print injection status
+      Tier 0: Init ∧ ¬hint is UNSAT              (each hint holds in initial state)
+      Tier 3: (∧ hints) ∧ Post ∧ T ∧ ¬(∧ hints)' is UNSAT  (jointly inductive)
+      Tier 2: hint ∧ Post ∧ T ∧ ¬hint' is UNSAT  (individually relatively inductive)
+
+    Flow:
+      1. Tier 0 filters out hints that violate init.
+      2. Tier 3 checks if ALL remaining hints are jointly inductive (1 SAT call).
+         → Pass: inject all.
+         → Fail: fallback to Tier 2, inject only individually inductive hints.
 
     Returns:
         number of successfully injected hints
@@ -424,44 +427,70 @@ def verify_and_inject(pdr_instance, hints, verbose=True):
     post = pdr_instance.post.cube()
     primeMap = pdr_instance.primeMap
     inp_map = pdr_instance.inp_map
+    init_cube = pdr_instance.init.cube()
 
-    injected = 0
+    # ── Tier 0: filter hints that violate init ───────────────────────
+    init_valid = []
     rejected_init = 0
-    rejected_ind = 0
     for i, hint in enumerate(hints):
-        # Tier 0: hint holds in initial state
-        res0 = pdr_instance.check_sat(
-            And(pdr_instance.init.cube(), Not(hint)),
-            return_res=True
-        )
-        if res0 != unsat:
+        res = pdr_instance.check_sat(And(init_cube, Not(hint)), return_res=True)
+        if res == unsat:
+            init_valid.append((i, hint))
+        else:
             rejected_init += 1
             if verbose:
                 print(f"  [hint {i}] REJECTED (violates init): {_short_repr(hint)}")
-            continue
 
-        # Tier 2: relatively inductive w.r.t. property
-        #   hint ∧ Post ∧ T ∧ ¬hint' is UNSAT?
+    if not init_valid:
+        if verbose:
+            print(f"  → 0/{len(hints)} injected ({rejected_init} failed init)")
+        return 0
+
+    # ── Tier 3: joint inductiveness check (1 SAT call) ───────────────
+    all_hints_conj = And([h for _, h in init_valid])
+    all_hints_conj_prime = substitute(substitute(all_hints_conj, primeMap), inp_map)
+    res3 = pdr_instance.check_sat(
+        And(all_hints_conj, post, trans, Not(all_hints_conj_prime)),
+        return_res=True
+    )
+
+    if res3 == unsat:
+        # Tier 3 passed — all hints are jointly inductive, inject all
+        for idx, hint in init_valid:
+            for fidx in range(1, len(pdr_instance.frames)):
+                pdr_instance.frames[fidx].addLemma(hint, pushed=False)
+            if verbose:
+                print(f"  [hint {idx}] INJECTED (joint): {_short_repr(hint)}")
+        if verbose:
+            print(f"  → {len(init_valid)}/{len(hints)} injected via Tier 3 (jointly inductive), "
+                  f"{rejected_init} failed init")
+        return len(init_valid)
+
+    # ── Tier 3 failed — fallback to Tier 2: individual filtering ─────
+    if verbose:
+        print(f"  Tier 3 failed (not jointly inductive), falling back to Tier 2...")
+
+    injected = 0
+    rejected_ind = 0
+    for idx, hint in init_valid:
         hint_prime = substitute(substitute(hint, primeMap), inp_map)
         res2 = pdr_instance.check_sat(
             And(hint, post, trans, Not(hint_prime)),
             return_res=True
         )
-        if res2 != unsat:
+        if res2 == unsat:
+            for fidx in range(1, len(pdr_instance.frames)):
+                pdr_instance.frames[fidx].addLemma(hint, pushed=False)
+            injected += 1
+            if verbose:
+                print(f"  [hint {idx}] INJECTED (individual): {_short_repr(hint)}")
+        else:
             rejected_ind += 1
             if verbose:
-                print(f"  [hint {i}] REJECTED (not relatively inductive): {_short_repr(hint)}")
-            continue
-
-        # Passed both checks — inject into all frames >= 1
-        for fidx in range(1, len(pdr_instance.frames)):
-            pdr_instance.frames[fidx].addLemma(hint, pushed=False)
-        injected += 1
-        if verbose:
-            print(f"  [hint {i}] INJECTED: {_short_repr(hint)}")
+                print(f"  [hint {idx}] REJECTED (not relatively inductive): {_short_repr(hint)}")
 
     if verbose:
-        print(f"  → {injected}/{len(hints)} injected, "
+        print(f"  → {injected}/{len(hints)} injected via Tier 2 fallback, "
               f"{rejected_init} failed init, {rejected_ind} failed inductiveness")
     return injected
 

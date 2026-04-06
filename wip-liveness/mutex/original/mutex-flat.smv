@@ -1,0 +1,141 @@
+-- Flattened Boolean FSM model  generated from mutex.smv
+-- Dumped cwd->layers are: model model_bool determ determ_bool __TempLayer_0 
+
+MODULE main
+-- Input variables from layer 'model'
+-- Input variables from layer 'model_bool'
+-- Input variables from layer 'determ'
+-- Input variables from layer 'determ_bool'
+-- Input variables from layer '__TempLayer_0'
+-- State variables from layer 'model'
+-- DEFINE
+-- state1 :=  (state1.1 ? t1 :  (state1.0 ? c1 : n1) ) ;
+-- state2 :=  (state2.1 ? t2 :  (state2.0 ? c2 : n2) ) ;
+-- turn :=  (turn.0 ? 2 : 1) ;
+
+-- State variables from layer 'model_bool'
+VAR
+state1.1 : boolean;
+state1.0 : boolean;
+state2.1 : boolean;
+state2.0 : boolean;
+turn.0 : boolean;
+
+-- State variables from layer 'determ'
+-- State variables from layer 'determ_bool'
+-- State variables from layer '__TempLayer_0'
+-- Frozen variables from layer 'model'
+-- Frozen variables from layer 'model_bool'
+-- Frozen variables from layer 'determ'
+-- Frozen variables from layer 'determ_bool'
+-- Frozen variables from layer '__TempLayer_0'
+-- CONSTANTS
+--  n1, t1, c1, n2, t2, c2 ;
+
+INIT
+ __expr0
+
+INIT
+ !state1.0
+
+INIT
+ __expr1
+
+INIT
+ !state2.0
+
+INIT
+ !turn.0
+
+
+INVAR
+ (__expr0 | !state1.0)
+
+INVAR
+ (__expr1 | !state2.0)
+
+
+TRANS
+ __expr10
+
+TRANS
+ __expr14
+
+TRANS
+ __expr16
+
+TRANS
+ __expr10
+
+TRANS
+ __expr14
+
+TRANS
+ __expr16
+
+
+
+LTLSPEC
+ G (__expr0 |  F __expr8)
+
+LTLSPEC
+!( G (__expr0 |  F __expr8))
+
+-- Symbols introduced by the dumper:
+DEFINE __expr2 := (__expr0 & !state1.0) ;
+
+DEFINE __expr9 := !next(state1.0) ;
+
+DEFINE __expr7 := !next(state1.1) ;
+
+DEFINE __expr8 := (__expr0 & state1.0) ;
+
+DEFINE __expr11 := (__expr4 & state1.1) ;
+
+DEFINE __expr13 := !next(state2.0) ;
+
+DEFINE __expr4 := (__expr1 & !state2.0) ;
+
+DEFINE __expr6 := (__expr1 & state2.0) ;
+
+DEFINE __expr10 := case
+(__expr3 | (__expr5 | (__expr2 & __expr6))) : next(state1.1);
+((state1.1 & __expr4) | ((state1.1 & state2.1) & !turn.0)) : (__expr7 & next(state1.0));
+__expr8 : (__expr7 & __expr9);
+state1.1 : next(state1.1);
+TRUE : (__expr7 & case
+state1.0 : next(state1.0);
+TRUE : __expr9;
+esac);
+esac ;
+
+DEFINE __expr16 := case
+__expr3 : next(turn.0);
+__expr11 : __expr15;
+turn.0 : next(turn.0);
+TRUE : __expr15;
+esac ;
+
+DEFINE __expr3 := (__expr2 & state2.1) ;
+
+DEFINE __expr12 := !next(state2.1) ;
+
+DEFINE __expr5 := (__expr2 & __expr4) ;
+
+DEFINE __expr15 := !next(turn.0) ;
+
+DEFINE __expr1 := !state2.1 ;
+
+DEFINE __expr14 := case
+(__expr11 | ((__expr4 & __expr2) | (__expr4 & __expr8))) : next(state2.1);
+((state2.1 & __expr2) | ((state2.1 & state1.1) & turn.0)) : (__expr12 & next(state2.0));
+__expr6 : (__expr12 & __expr13);
+state2.1 : next(state2.1);
+TRUE : (__expr12 & case
+state2.0 : next(state2.0);
+TRUE : __expr13;
+esac);
+esac ;
+
+DEFINE __expr0 := !state1.1 ;
+
