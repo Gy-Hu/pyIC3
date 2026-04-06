@@ -21,7 +21,7 @@ import subprocess
 import time
 import sys
 
-from llm_oracle import load_llm_config
+from llm_oracle import load_llm_config, AIGERSymbolMap, PredicateEncoder
 
 _cfg = load_llm_config()
 
@@ -138,11 +138,15 @@ def fmt_time(r):
 
 # ── Mode: single run ────────────────────────────────────────────────
 
-def mode_single(aag, map_file, verilog, timeout, api_url, api_key, model):
+def mode_single(aag, map_file, verilog, timeout, api_url, api_key, model, save_path=None):
     print(f"Generating LLM hints ({model})...")
     t0 = time.time()
-    hints, _ = generate_hints(aag, map_file, verilog, api_url, api_key, model)
+    hints, raw_code = generate_hints(aag, map_file, verilog, api_url, api_key, model)
     print(f"  {len(hints)} hints in {time.time()-t0:.1f}s")
+
+    if save_path and hints:
+        from llm_oracle import save_hints
+        save_hints(hints, raw_code, save_path, metadata={"model": model, "source": verilog})
 
     print(f"Running LLM-guided IC3 (timeout={timeout}s)...")
     r = run_ic3(aag, hint_lemmas=hints, timeout_sec=timeout)
@@ -276,6 +280,8 @@ def main():
     p.add_argument("--compare", action="store_true", help="Run vanilla + LLM side by side")
     p.add_argument("--batch", action="store_true", help="Run all BlockSys benchmarks")
     p.add_argument("--no-llm", action="store_true", help="Vanilla IC3 only")
+    p.add_argument("--load-hints", help="Load pre-verified hints from JSON (skip LLM call)")
+    p.add_argument("--save-hints", help="Save generated hints to JSON for reuse")
     p.add_argument("--timeout", type=int, default=300)
     p.add_argument("--model", default=_cfg["model"])
     p.add_argument("--api-url", default=_cfg["api_url"])
@@ -305,7 +311,19 @@ def main():
         aag_file, map_file = args.aag, None
         args.no_llm = True
 
-    if args.no_llm:
+    if args.load_hints:
+        # Load pre-verified hints and run IC3
+        from llm_oracle import load_hints
+        import model_encoder
+        m_ = model_encoder.Model(); r_ = m_.parse(aag_file)
+        smap_ = AIGERSymbolMap(map_file); enc_ = PredicateEncoder(smap_, r_[1])
+        hints, meta = load_hints(args.load_hints, enc_)
+        if meta:
+            print(f"  metadata: {meta}")
+        print(f"Running IC3 with {len(hints)} loaded hints (timeout={args.timeout}s)...")
+        r = run_ic3(aag_file, hint_lemmas=hints, timeout_sec=args.timeout)
+        print(f"  {fmt_time(r)}  frames={r['frames']}  sat_calls={r['sat_calls']}")
+    elif args.no_llm:
         print(f"Running vanilla IC3 (timeout={args.timeout}s)...")
         r = run_ic3(aag_file, timeout_sec=args.timeout)
         print(f"  {fmt_time(r)}  frames={r['frames']}  sat_calls={r['sat_calls']}")
@@ -316,7 +334,8 @@ def main():
         if not map_file or not args.verilog:
             p.error("LLM mode requires --map and --verilog (or just --verilog for auto-convert)")
         mode_single(aag_file, map_file, args.verilog, args.timeout,
-                    args.api_url, args.api_key, args.model)
+                    args.api_url, args.api_key, args.model,
+                    save_path=args.save_hints)
 
 
 if __name__ == "__main__":

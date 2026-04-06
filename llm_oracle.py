@@ -176,6 +176,28 @@ class PredicateEncoder:
         """var_a != var_b."""
         return Not(self.word_eq(var_a, var_b))
 
+    def word_lt(self, var_a, var_b):
+        """Unsigned var_a < var_b, built bit-by-bit from LSB to MSB."""
+        bits_a = self._get_bits(var_a)
+        bits_b = self._get_bits(var_b)
+        assert len(bits_a) == len(bits_b), f"Width mismatch: {var_a} vs {var_b}"
+        lt = BoolVal(False)
+        for (a, _), (b, _) in zip(bits_a, bits_b):  # LSB to MSB
+            lt = Or(And(Not(a), b), And(a == b, lt))
+        return lt
+
+    def word_gt(self, var_a, var_b):
+        """Unsigned var_a > var_b."""
+        return self.word_lt(var_b, var_a)
+
+    def word_le(self, var_a, var_b):
+        """Unsigned var_a <= var_b."""
+        return Not(self.word_gt(var_a, var_b))
+
+    def word_ge(self, var_a, var_b):
+        """Unsigned var_a >= var_b."""
+        return Not(self.word_lt(var_a, var_b))
+
     def bit_var(self, var_name, bit_idx):
         """Get a specific bit of a multi-bit variable as Z3 Bool."""
         bits_info = self.smap.word_vars.get(var_name)
@@ -221,6 +243,10 @@ class PredicateEncoder:
         ns['word_neq_zero'] = self.word_neq_zero
         ns['word_eq'] = self.word_eq
         ns['word_neq'] = self.word_neq
+        ns['word_lt'] = self.word_lt
+        ns['word_gt'] = self.word_gt
+        ns['word_le'] = self.word_le
+        ns['word_ge'] = self.word_ge
 
         # Direct variable names for 1-bit vars
         for name, bits in self.smap.word_vars.items():
@@ -235,33 +261,43 @@ class PredicateEncoder:
 # ─────────────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = """You are a formal verification expert specializing in hardware model checking.
-Your task: given a Verilog module and its safety property, generate candidate
-inductive invariant predicates that would help an IC3/PDR model checker prove the property.
+Your task: given a Verilog module and its safety property, generate INDIVIDUALLY
+INDUCTIVE invariant predicates that help an IC3/PDR model checker prove the property.
 
-Think about:
-1. What high-level protocol invariants maintain safety?
-2. What mutual exclusion / ordering constraints exist?
-3. What relationships between variables are always preserved?
+CRITICAL REQUIREMENT: Each hint must be INDIVIDUALLY relatively-inductive, meaning:
+  If the hint AND the safety property both hold in some state,
+  then after ONE transition step, the hint STILL holds.
+  Formally: hint ∧ Post ∧ T → hint'
+
+A simple predicate like Not(And(a, b)) is usually NOT individually inductive because
+the solver cannot rule out both a and b becoming true in one step. To make it inductive,
+you must COMBINE it with the conditions that prevent the violation. For example:
+  - Instead of Not(And(held_0, held_1)),
+    write Implies(And(held_0, held_1), word_eq("ep_0", "ep_1"))
+    which is inductive because the protocol guarantees distinct epochs.
+  - Or write Implies(held_0, Or(word_eq_zero("transfer_0"), ...))
+    tying the state to transition guards.
+
+Think step by step:
+1. What is the key protocol mechanism that maintains safety?
+2. For each invariant, WHY is it preserved by every possible transition?
+3. Does each hint contain enough context to be self-sustaining?
 
 Output ONLY a Python list named `hints`. Use these APIs:
 - bool_var("name") → 1-bit Verilog variable as Z3 Bool
-- bit_var("name", idx) → specific bit of a multi-bit var (e.g., bit_var("nitems", 2))
+- bit_var("name", idx) → specific bit of multi-bit var (e.g., bit_var("nitems", 2))
 - word_eq_zero("name") → multi-bit var == 0
 - word_neq_zero("name") → multi-bit var != 0
 - word_eq("a", "b") → two multi-bit vars are equal
 - word_neq("a", "b") → two multi-bit vars differ
+- word_lt("a", "b") → unsigned a < b
+- word_gt("a", "b") → unsigned a > b
+- word_le("a", "b") / word_ge("a", "b") → unsigned ≤ / ≥
 - Z3 operators: And, Or, Not, Implies
 
 For 1-bit variables, you can use the name directly (e.g., `held_0` instead of `bool_var("held_0")`).
-IMPORTANT: use variable names exactly as shown in the symbol table. Do NOT use array slices like var[2:0].
-
-Example output:
-```python
-hints = [
-    Not(And(held_0, held_1)),           # mutual exclusion
-    Implies(held_0, word_neq_zero("ep_0")),  # epoch invariant
-]
-```"""
+IMPORTANT: use variable names exactly as shown in the symbol table. Do NOT use array slices.
+Prefer STRONG composite predicates over many weak simple ones."""
 
 
 def build_user_prompt(verilog_source, property_desc, symbol_summary):
@@ -499,3 +535,60 @@ def _short_repr(expr, max_len=80):
     """Short string repr of a Z3 expression."""
     s = str(expr)
     return s if len(s) <= max_len else s[:max_len-3] + "..."
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 5. Hint persistence: save/load verified hints
+# ─────────────────────────────────────────────────────────────────────
+
+def save_hints(hints, raw_response, filepath, metadata=None):
+    """Save verified hints to a JSON file for later reuse.
+
+    Stores the LLM's raw response (containing the Python code block).
+    On load, the code block is extracted and eval'd with the encoder.
+
+    Args:
+        hints: list of Z3 expressions (for counting)
+        raw_response: the LLM's full response text
+        filepath: output .json path
+        metadata: optional dict (model, iterations, etc.)
+    """
+    import json
+    code = _extract_code_block(raw_response)
+    data = {
+        "code": code,
+        "hint_count": len(hints),
+        "metadata": metadata or {},
+    }
+    with open(filepath, 'w') as f:
+        json.dump(data, f, indent=2)
+    print(f"  Saved {len(hints)} hints to {filepath}")
+
+
+def load_hints(filepath, encoder):
+    """Load hints from a JSON file and reconstruct Z3 expressions.
+
+    Args:
+        filepath: .json file saved by save_hints()
+        encoder: PredicateEncoder instance
+
+    Returns:
+        hints: list of Z3 Bool expressions
+        metadata: dict
+    """
+    import json
+    with open(filepath) as f:
+        data = json.load(f)
+
+    ns = encoder.build_eval_namespace()
+    code = data["code"]
+
+    # Try bulk eval, fallback to per-hint
+    try:
+        exec(code, ns)
+        hints = ns.get('hints', [])
+    except Exception:
+        hints = _eval_hints_individually(code, ns)
+
+    print(f"  Loaded {len(hints)} hints from {filepath}")
+    return hints, data.get("metadata", {})
