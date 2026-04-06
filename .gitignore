@@ -1,3 +1,4 @@
+.env
 aiger_tools/
 __pycache__/
 dataset/

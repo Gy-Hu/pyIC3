@@ -126,6 +126,40 @@ All benchmarks were verified using both **pyIC3** (Python IC3/PDR implementation
 - **pyIC3 time range**: 0.058s to 108.364s (3 orders of magnitude)
 - **rIC3 time range**: 0.00s to 199.44s (toy_lock_4 is the only slow case)
 
+### LLM-Guided IC3 Results
+
+We re-converted all 12 benchmarks via a Yosys `aigmap` pipeline that preserves RTL-to-AIGER symbol mappings (see `convert_all.sh`). An LLM (Claude Sonnet 4.6) reads the original Verilog source and generates candidate invariant predicates, which are encoded as Z3 clauses and injected into IC3 frames before solving. See `run_llm.py --batch` to reproduce.
+
+| # | Benchmark | Hints | Vanilla | W/Hints | dFrames | dTime | dSAT |
+|---|-----------|-------|---------|---------|---------|-------|------|
+| 1 | client_server | 15 | 0.044s / 3F | 0.024s / 3F | 0 | **-45%** | -27% |
+| 2 | toy_lock_4 | 28 | T/O / 4F | T/O / 4F | 0 | - | -15% |
+| 3 | h_Dekker | 11 | 0.53s / 8F | 0.17s / 5F | **-3** | **-68%** | -65% |
+| 4 | h_Arbiter | 0* | 0.10s / 3F | 0.10s / 3F | 0 | 0 | 0 |
+| 5 | h_TreeArb | 14 | 57s / 14F | 72.5s / 14F | 0 | +27% | +15% |
+| 6 | cache_coherence_two | 0* | 0.66s / 4F | 0.62s / 4F | 0 | -7% | -12% |
+| 7 | cache_coherence_three | 12 | 2.02s / 6F | 1.93s / 4F | **-2** | -5% | -8% |
+| 8 | sw_state_machine | 20 | 0.58s / 5F | 1.14s / 8F | +3 | +97% | +182% |
+| 9 | h_Vending | 10 | 16.1s / 15F | 12.2s / 13F | **-2** | **-24%** | -27% |
+| 10 | Heap | 15 | T/O / 22F | ERROR | - | - | - |
+| 11 | **h_CRC** | 3 | 38.5s / 4F | **0.95s** / 4F | 0 | **-97.5%** | **-97%** |
+| 12 | h_FIFO | 21 | 6.33s / 5F | 4.96s / 5F | 0 | **-22%** | -14% |
+
+\* LLM hint encoding failed (hierarchical variable names not in AIGER map), equivalent to 0 hints.
+
+**Key findings**:
+
+- **7/10 benchmarks with hints improved** (time or frame reduction).
+- **3 benchmarks with frame reduction**: h_Dekker (8->5), cache_coherence_three (6->4), h_Vending (15->13).
+- **Best speedup: h_CRC 40x** (38.5s -> 0.95s). This is an unsafe case — LLM hints prune the counterexample search space, reducing SAT calls from 10247 to 287.
+- **2 benchmarks worsened** (h_TreeArb, sw_state_machine): incorrect LLM-generated hints over-constrain frames and increase spurious CTIs. This highlights the importance of hint quality filtering.
+
+**Open problems**:
+
+1. **toy_lock_4 and Heap still timeout**: 100 latches (toy_lock_4) and 24 latches with 79 inputs (Heap) create transition relations too large for Z3's per-SAT-call performance. Hints reduce SAT call count but cannot compensate for the fundamental overhead of Z3 on propositional formulas. Using a dedicated SAT solver (Kissat/CaDiCaL) as backend would likely resolve this.
+2. **Hint quality**: Incorrect hints degrade performance (h_TreeArb +27%, sw_state_machine +97%). A lightweight init-consistency check (`init AND NOT(hint)` is UNSAT) is applied, but this does not filter non-inductive hints. A relative-inductiveness check or bounded model checking filter would improve robustness.
+3. **Variable name resolution**: LLM-generated variable references sometimes use hierarchical (`pcacheA.state`) or double-indexed (`pc[0][2:0]`) names that don't match the flat AIGER symbol table. A progressive bracket-stripping fallback partially addresses this but doesn't cover all patterns.
+
 ## Benchmark Source Paths
 
 All benchmarks are sourced from the mc-benchmark repository.

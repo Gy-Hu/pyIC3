@@ -16,8 +16,26 @@ C++/Rust IC3 implementations cannot do this.
 """
 
 import json
+import os
 import requests
 from z3 import *
+
+
+def load_llm_config():
+    """Load LLM config from .env file or environment variables."""
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, val = line.split('=', 1)
+                    os.environ.setdefault(key.strip(), val.strip())
+    return {
+        "api_url": os.environ.get("LLM_API_URL", ""),
+        "api_key": os.environ.get("LLM_API_KEY", ""),
+        "model":   os.environ.get("LLM_MODEL", "claude-sonnet-4-6"),
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -53,6 +71,27 @@ class AIGERSymbolMap:
                     name = parts[3]
                     self.input_info[idx] = (name, bit)
 
+        # Regroup name[N] patterns into word-level variables.
+        # e.g., "c[0]" (bit 0) and "c[1]" (bit 0) → "c" with bits 0, 1
+        import re as _re
+        regrouped = {}
+        for name, bits in list(self.word_vars.items()):
+            m = _re.match(r'^(.+)\[(\d+)\]$', name)
+            if m and len(bits) == 1:
+                base = m.group(1)
+                bit_from_name = int(m.group(2))
+                latch_idx, _, is_inv = bits[0]
+                regrouped.setdefault(base, []).append((latch_idx, bit_from_name, is_inv))
+            # else keep as is
+        # Merge regrouped into word_vars, remove the name[N] entries
+        for base, bits in regrouped.items():
+            if base not in self.word_vars:
+                self.word_vars[base] = bits
+                # Remove individual name[N] entries
+                for _, bit_idx, _ in bits:
+                    old_key = f"{base}[{bit_idx}]"
+                    self.word_vars.pop(old_key, None)
+
         # sort bits within each word variable
         for name in self.word_vars:
             self.word_vars[name].sort(key=lambda x: x[1])
@@ -86,12 +125,17 @@ class PredicateEncoder:
         """Get list of (z3_expr_for_true_value, bit_idx) for a word variable."""
         bits_info = self.smap.word_vars.get(var_name)
         if bits_info is None:
-            # Handle LLM patterns like "v.state[1:0]" or "name[3]"
+            # Progressively strip trailing [n:m] or [n] to find the base variable.
+            # Handles: "pc[0][2:0]" → try "pc[0]" → found!
+            #          "v.state[1:0]" → try "v.state" → found!
             import re
-            m = re.match(r'^(.+?)(\[[\d:]+\])+$', var_name)
-            if m:
-                base = m.group(1)
-                bits_info = self.smap.word_vars.get(base)
+            candidate = var_name
+            while bits_info is None:
+                candidate = re.sub(r'\[\d+(?::\d+)?\]$', '', candidate)
+                if candidate == var_name or not candidate:
+                    break
+                bits_info = self.smap.word_vars.get(candidate)
+                var_name = candidate  # for next iteration
             if bits_info is None:
                 raise ValueError(f"Unknown variable: {var_name}")
         result = []
@@ -136,7 +180,17 @@ class PredicateEncoder:
         """Get a specific bit of a multi-bit variable as Z3 Bool."""
         bits_info = self.smap.word_vars.get(var_name)
         if bits_info is None:
-            raise ValueError(f"Unknown variable: {var_name}")
+            # Same progressive stripping as _get_bits
+            import re
+            candidate = var_name
+            while bits_info is None:
+                candidate = re.sub(r'\[\d+(?::\d+)?\]$', '', candidate)
+                if candidate == var_name or not candidate:
+                    break
+                bits_info = self.smap.word_vars.get(candidate)
+                var_name = candidate
+            if bits_info is None:
+                raise ValueError(f"Unknown variable: {var_name}")
         for latch_idx, bidx, is_inv in bits_info:
             if bidx == bit_idx:
                 z3_var = self.z3_vars[latch_idx]
