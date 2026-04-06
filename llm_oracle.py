@@ -313,6 +313,9 @@ class LLMOracle:
     def generate_hints(self, verilog_source, property_desc, symbol_map, encoder):
         """Full pipeline: LLM → parse → Z3 expressions.
 
+        Evaluates each hint individually so that a single bad reference
+        (e.g., a Verilog macro name like K2) doesn't discard all hints.
+
         Returns:
             hints: list of Z3 Bool expressions
             raw_response: the LLM's raw text (for logging/paper)
@@ -320,15 +323,65 @@ class LLMOracle:
         summary = symbol_map.summary()
         raw = self.call_llm(verilog_source, property_desc, summary)
 
-        # Extract Python code block from response
         code = _extract_code_block(raw)
-
-        # Eval in the encoder's namespace
         ns = encoder.build_eval_namespace()
-        exec(code, ns)
-        hints = ns.get('hints', [])
 
+        # Try bulk eval first (fast path)
+        try:
+            exec(code, ns)
+            return ns.get('hints', []), raw
+        except Exception:
+            pass
+
+        # Fallback: wrap each hint in try/except via rewritten code
+        hints = _eval_hints_individually(code, ns)
         return hints, raw
+
+
+def _eval_hints_individually(code, ns):
+    """Parse the hints list from LLM code and eval each element separately."""
+    import re
+    # Extract the list body from "hints = [...]"
+    m = re.search(r'hints\s*=\s*\[(.*)\]', code, re.DOTALL)
+    if not m:
+        return []
+
+    # Split on top-level commas (not inside parentheses)
+    body = m.group(1)
+    elements = _split_top_level(body)
+
+    valid = []
+    for i, elem in enumerate(elements):
+        elem = elem.strip()
+        if not elem:
+            continue
+        try:
+            result = eval(elem, ns)
+            valid.append(result)
+        except Exception as e:
+            # Skip this hint, continue with others
+            pass
+    return valid
+
+
+def _split_top_level(text):
+    """Split text by commas that are not inside parentheses/brackets."""
+    parts = []
+    depth = 0
+    current = []
+    for ch in text:
+        if ch in '([':
+            depth += 1
+        elif ch in ')]':
+            depth -= 1
+        elif ch == ',' and depth == 0:
+            parts.append(''.join(current))
+            current = []
+            continue
+        current.append(ch)
+    if current:
+        parts.append(''.join(current))
+    return parts
 
 
 def _extract_code_block(text):
@@ -353,7 +406,11 @@ def _extract_code_block(text):
 # ─────────────────────────────────────────────────────────────────────
 
 def verify_and_inject(pdr_instance, hints, verbose=True):
-    """Verify hints against init state and inject into IC3 frames.
+    """Verify hints and inject into IC3 frames.
+
+    Two-tier filter before injection:
+      Tier 0: Init ∧ ¬hint is UNSAT          (hint holds in initial state)
+      Tier 2: hint ∧ Post ∧ T ∧ ¬hint' is UNSAT  (relatively inductive w.r.t. property)
 
     Args:
         pdr_instance: PDR solver (after frames are initialized)
@@ -363,26 +420,49 @@ def verify_and_inject(pdr_instance, hints, verbose=True):
     Returns:
         number of successfully injected hints
     """
+    trans = pdr_instance.trans.cube()
+    post = pdr_instance.post.cube()
+    primeMap = pdr_instance.primeMap
+    inp_map = pdr_instance.inp_map
+
     injected = 0
+    rejected_init = 0
+    rejected_ind = 0
     for i, hint in enumerate(hints):
-        # Check: init ∧ ¬hint is UNSAT → hint holds in initial state
-        res = pdr_instance.check_sat(
+        # Tier 0: hint holds in initial state
+        res0 = pdr_instance.check_sat(
             And(pdr_instance.init.cube(), Not(hint)),
             return_res=True
         )
-        if res == unsat:
-            # Safe to inject: add as lemma to frame 1 (and all existing frames ≥ 1)
-            for fidx in range(1, len(pdr_instance.frames)):
-                pdr_instance.frames[fidx].addLemma(hint, pushed=False)
-            injected += 1
-            if verbose:
-                print(f"  [hint {i}] INJECTED: {_short_repr(hint)}")
-        else:
+        if res0 != unsat:
+            rejected_init += 1
             if verbose:
                 print(f"  [hint {i}] REJECTED (violates init): {_short_repr(hint)}")
+            continue
+
+        # Tier 2: relatively inductive w.r.t. property
+        #   hint ∧ Post ∧ T ∧ ¬hint' is UNSAT?
+        hint_prime = substitute(substitute(hint, primeMap), inp_map)
+        res2 = pdr_instance.check_sat(
+            And(hint, post, trans, Not(hint_prime)),
+            return_res=True
+        )
+        if res2 != unsat:
+            rejected_ind += 1
+            if verbose:
+                print(f"  [hint {i}] REJECTED (not relatively inductive): {_short_repr(hint)}")
+            continue
+
+        # Passed both checks — inject into all frames >= 1
+        for fidx in range(1, len(pdr_instance.frames)):
+            pdr_instance.frames[fidx].addLemma(hint, pushed=False)
+        injected += 1
+        if verbose:
+            print(f"  [hint {i}] INJECTED: {_short_repr(hint)}")
 
     if verbose:
-        print(f"  → {injected}/{len(hints)} hints injected into IC3 frames")
+        print(f"  → {injected}/{len(hints)} injected, "
+              f"{rejected_init} failed init, {rejected_ind} failed inductiveness")
     return injected
 
 
