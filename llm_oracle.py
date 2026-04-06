@@ -457,10 +457,17 @@ def verify_and_inject(pdr_instance, hints, verbose=True):
     inp_map = pdr_instance.inp_map
     init_cube = pdr_instance.init.cube()
 
+    # ── Pre-filter: skip non-Z3 objects (strings, None, etc.) ──────
+    from z3 import is_expr
+    valid_hints = [(i, h) for i, h in enumerate(hints) if is_expr(h)]
+    if len(valid_hints) < len(hints) and verbose:
+        print(f"  Skipped {len(hints) - len(valid_hints)} non-Z3 hints")
+    hints_enum = valid_hints
+
     # ── Tier 0: filter hints that violate init ───────────────────────
     init_valid = []
     rejected_init = 0
-    for i, hint in enumerate(hints):
+    for i, hint in hints_enum:
         res = pdr_instance.check_sat(And(init_cube, Not(hint)), return_res=True)
         if res == unsat:
             init_valid.append((i, hint))

@@ -14,3 +14,4 @@ run
 ask_LLM.sh
 tmp.cp
 deprecated/tmp.txt
+autoresearch-results.tsv
