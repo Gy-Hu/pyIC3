@@ -1,1 +1,0 @@
-!((F(G((s.req=MANY)->(O((s.req=ONE)->(O(s.req=NONE)))))))&((G(F(s.req=MANY)))&(G(F(s.req=ONE)))))
