@@ -15,3 +15,7 @@ ask_LLM.sh
 tmp.cp
 deprecated/tmp.txt
 autoresearch-results.tsv
+deprecated/
+.DS_Store
+.vscode/
+*.pyc
