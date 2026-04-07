@@ -1,0 +1,235 @@
+[
+  {
+    "name": "client_server",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/client_server/data/client_server.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 11.658,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 20,
+    "hints_injected": 20,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 0.028,
+    "frames": 3,
+    "sat_calls": 67,
+    "wall": 11.703,
+    "wall_outer": 11.849
+  },
+  {
+    "name": "cache_coherence_three",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_three/data/cache_coherence_three.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 24.024,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 0,
+    "hints_injected": null,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 1.273,
+    "frames": 4,
+    "sat_calls": 476,
+    "wall": 25.454,
+    "wall_outer": 25.603
+  },
+  {
+    "name": "h_Arbiter",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Arbiter/data/h_Arbiter.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 26.643,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 32,
+    "hints_injected": 32,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 0.118,
+    "frames": 4,
+    "sat_calls": 167,
+    "wall": 26.799,
+    "wall_outer": 26.94
+  },
+  {
+    "name": "h_CRC",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_CRC/data/h_CRC.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 25.738,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 20,
+    "hints_injected": 1,
+    "status": "ok",
+    "verdict": "unsafe",
+    "time": 1.809,
+    "frames": 4,
+    "sat_calls": 776,
+    "wall": 27.634,
+    "wall_outer": 27.789
+  },
+  {
+    "name": "cache_coherence_two",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_two/data/cache_coherence_two.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 27.718,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 18,
+    "hints_injected": 18,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 0.285,
+    "frames": 4,
+    "sat_calls": 153,
+    "wall": 28.112,
+    "wall_outer": 28.261
+  },
+  {
+    "name": "h_FIFO",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_FIFO/data/h_FIFO.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 25.922,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 26,
+    "hints_injected": 24,
+    "status": "ok",
+    "verdict": "unsafe",
+    "time": 3.023,
+    "frames": 5,
+    "sat_calls": 1125,
+    "wall": 29.028,
+    "wall_outer": 29.164
+  },
+  {
+    "name": "toy_lock_4",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/toy_lock_4/data/toy_lock_4.aag",
+    "hint_source": "cached",
+    "hint_load_time": 0.046,
+    "hint_metadata": {
+      "model": "claude-opus-4-6",
+      "attempt": 4,
+      "rounds": 5,
+      "hint_count": 64,
+      "temp": 0.36
+    },
+    "hints_generated": 64,
+    "hints_injected": 64,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 1.442,
+    "frames": 3,
+    "sat_calls": 199,
+    "wall": 1.609,
+    "wall_outer": 1.732
+  },
+  {
+    "name": "h_Dekker",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Dekker/data/h_Dekker.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 33.297,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 16,
+    "hints_injected": 16,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 0.035,
+    "frames": 3,
+    "sat_calls": 55,
+    "wall": 33.368,
+    "wall_outer": 33.515
+  },
+  {
+    "name": "sw_state_machine",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/sw_state_machine/data/sw_state_machine.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 26.9,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 0,
+    "hints_injected": null,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 1.013,
+    "frames": 7,
+    "sat_calls": 422,
+    "wall": 28.034,
+    "wall_outer": 28.156
+  },
+  {
+    "name": "h_Vending",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Vending/data/h_Vending.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 33.943,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 25,
+    "hints_injected": 22,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 9.514,
+    "frames": 14,
+    "sat_calls": 4869,
+    "wall": 43.596,
+    "wall_outer": 43.72
+  },
+  {
+    "name": "h_TreeArb",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_TreeArb/data/h_TreeArb.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 23.511,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 0,
+    "hints_injected": null,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 53.229,
+    "frames": 15,
+    "sat_calls": 18404,
+    "wall": 76.912,
+    "wall_outer": 77.034
+  },
+  {
+    "name": "Heap",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/Heap/data/Heap.aag",
+    "hint_source": "cached",
+    "hint_load_time": 0.006,
+    "hint_metadata": {
+      "source": "high-level semantic invariants for Heap",
+      "target": "Heap",
+      "enums": {
+        "state": [
+          "IDLE",
+          "PUSH1",
+          "PUSH2",
+          "POP1",
+          "POP2",
+          "POP3",
+          "TEST1",
+          "TEST2"
+        ]
+      }
+    },
+    "hints_generated": 21,
+    "hints_injected": 21,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 90.511,
+    "frames": 22,
+    "sat_calls": 31196,
+    "wall": 90.602,
+    "wall_outer": 90.755
+  }
+]
