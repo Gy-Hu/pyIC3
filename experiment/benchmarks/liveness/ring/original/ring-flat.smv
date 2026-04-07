@@ -1,0 +1,109 @@
+-- Flattened Boolean FSM model  generated from ring.smv
+-- Dumped cwd->layers are: model model_bool determ determ_bool __TempLayer_0 
+
+MODULE main
+-- Input variables from layer 'model'
+-- DEFINE
+-- _process_selector_ :=  (_process_selector_.1 ?  (_process_selector_.0 ? gate1 : gate3)  :  (_process_selector_.0 ? gate2 : main) ) ;
+
+-- Input variables from layer 'model_bool'
+IVAR
+_process_selector_.1 : boolean;
+_process_selector_.0 : boolean;
+
+-- Input variables from layer 'determ'
+-- Input variables from layer 'determ_bool'
+-- Input variables from layer '__TempLayer_0'
+-- State variables from layer 'model'
+VAR
+gate1.output : boolean;
+gate2.output : boolean;
+gate3.output : boolean;
+
+-- State variables from layer 'model_bool'
+-- State variables from layer 'determ'
+-- State variables from layer 'determ_bool'
+-- State variables from layer '__TempLayer_0'
+-- Frozen variables from layer 'model'
+-- Frozen variables from layer 'model_bool'
+-- Frozen variables from layer 'determ'
+-- Frozen variables from layer 'determ_bool'
+-- Frozen variables from layer '__TempLayer_0'
+-- CONSTANTS
+--  main, gate3, gate2, gate1 ;
+
+INIT
+ __expr0
+
+INIT
+ __expr1
+
+INIT
+ __expr2
+
+
+
+TRANS
+ __expr3
+
+TRANS
+ __expr5
+
+TRANS
+ __expr3
+
+TRANS
+ __expr7
+
+TRANS
+ __expr5
+
+TRANS
+ __expr7
+
+
+FAIRNESS
+ (_process_selector_.1 & _process_selector_.0)
+
+
+FAIRNESS
+ __expr4
+
+
+FAIRNESS
+ __expr6
+
+
+
+LTLSPEC
+( G ( F gate1.output) &  G ( F __expr0))
+
+LTLSPEC
+(!( G ( F gate1.output)) &  G ( F __expr0))
+
+-- Symbols introduced by the dumper:
+DEFINE __expr1 := !gate2.output ;
+
+DEFINE __expr4 := (!_process_selector_.1 & _process_selector_.0) ;
+
+DEFINE __expr3 := (next(gate1.output) <-> case
+(_process_selector_.1 & _process_selector_.0) : __expr2;
+TRUE : gate1.output;
+esac) ;
+
+DEFINE __expr6 := (_process_selector_.1 & !_process_selector_.0) ;
+
+DEFINE __expr5 := (next(gate2.output) <-> case
+__expr4 : __expr0;
+TRUE : gate2.output;
+esac) ;
+
+DEFINE __expr7 := (next(gate3.output) <-> case
+__expr6 : __expr1;
+TRUE : gate3.output;
+esac) ;
+
+DEFINE __expr2 := !gate3.output ;
+
+DEFINE __expr0 := !gate1.output ;
+

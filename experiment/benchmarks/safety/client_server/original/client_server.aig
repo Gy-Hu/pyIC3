@@ -1,0 +1,24 @@
+aig 84 23 5 0 56 1
+74 1
+110
+122
+134
+146
+169
+"!*35
+3+.%14#88&DB&2PL1>%\V``bbdf	i0 clk
+i1 connect_client[4]
+i2 connect_client[3]
+i3 connect_client[2]
+i4 connect_client[1]
+i5 connect_client[0]
+i6 disconnect_client[4]
+i7 disconnect_client[3]
+i8 disconnect_client[2]
+i9 disconnect_client[1]
+i10 disconnect_client[0]
+l0 semaphore
+l1 link[3]
+l2 link[2]
+l3 link[1]
+l4 link[0]

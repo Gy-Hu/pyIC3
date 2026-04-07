@@ -1,0 +1,96 @@
+aig 496 7 43 0 446 1
+199 1
+213
+221 1
+226
+234
+240 1
+280 1
+364
+372
+389 1
+403
+411 1
+416 1
+74 1
+76
+90
+425
+433
+441
+70 1
+72
+474
+480 1
+487
+488
+496 1
+498
+577
+671
+757
+845
+852
+858 1
+861
+894
+900 1
+907
+908
+958
+964
+968 1
+972
+978
+993
+QVV[Y,C1I5RP;HBBAO	]r%[Z|<GizN±´µ[¯gZ­ž*1£*¦'’?‘AdlÈk«ªjØO®òíë†F‡ŒD›
+,PÙ•îä˜ƒ¨ŒeŠ¯´±*œ(º§5
+®ªYµ/,32À°ÏÔÔgpsíàáu~ëì†‰é»¸-‘ÈäÉÐìÑØôÙÙJƒ”†”œœŒ¢”À
+¨!û¬ÿ—•™È¼îÂå­šèáÒfÆù¿Ü „øò*íØ°ÿõ”¡W—‘óõ†¾PŠæé—Ÿ’í–»ƒ™½·¥œÑ
+L@ØÌÆ(ÁÏóäñUçáÝÚ¼—îÑÓä$œn×¦ùØþ•ªx„š“´¶¦«ñ$¾p¶ªÔ.„#Œ$ä³ÈÕcËÅ½¿´–VYÕZ×ÔíWƒïé¿#ãþƒ
+L@Šþ¨(Sÿ–£a™“ê"²Å´œ
+•—r Ž(ôí•p˜OûH³žÀä‚ðÂö¦˜
+¯Ü„¸»úí’’µì…Š‡€÷˜‘‰²’ë·á&å,ÑÖþå!çèÜë|âÐ ªÖO×Qi0 clk
+l0 pcacheB.proc.count[2]
+l1 pcacheB.proc.count[1]
+l2 pcacheB.proc.count[0]
+l3 pcacheB.write
+l4 pcacheB.inv_out
+l5 pcacheA.read
+l6 pcacheA.proc.valid
+l7 pcacheB.update
+l8 pcacheB.hit
+l9 pcacheA.proc.count[2]
+l10 pcacheA.proc.count[1]
+l11 pcacheA.proc.count[0]
+l12 pcacheB.miss
+l13 pcacheA.state[1]
+l14 pcacheA.state[0]
+l15 bus_arbiter.bus_ackA
+l16 bus_arbiter.shared_snoop[2]
+l17 bus_arbiter.shared_snoop[1]
+l18 bus_arbiter.shared_snoop[0]
+l19 pcacheB.state[1]
+l20 pcacheB.state[0]
+l21 pcacheB.snoop_type[2]
+l22 pcacheB.snoop_type[1]
+l23 pcacheB.snoop_type[0]
+l24 pcacheB.bus_req
+l25 pcacheA.miss
+l26 bus_arbiter.bus_ackB
+l27 pcacheB.next_state[1]
+l28 pcacheB.next_state[0]
+l29 pcacheA.next_state[1]
+l30 pcacheA.next_state[0]
+l31 bus_arbiter.invalidate
+l32 pcacheB.proc.valid
+l33 bus_arbiter.is_snoop
+l34 pcacheA.snoop_type[2]
+l35 pcacheA.snoop_type[1]
+l36 pcacheA.snoop_type[0]
+l37 pcacheA.bus_req
+l38 pcacheA.update
+l39 pcacheA.hit
+l40 pcacheB.read
+l41 pcacheA.write
+l42 pcacheA.inv_out

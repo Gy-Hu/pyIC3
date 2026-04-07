@@ -1,0 +1,1 @@
+!((G((s.rpc=WF)->((X((s.rpc=SI)|((s.rpc=RTS)|(s.rpc=NOK))))V(s.rpc=WF))))&((G((s.rpc=SI)->((X((s.rpc=SA)|(s.rpc=NOK)))V(s.rpc=SI))))&((G((s.rpc=SA)->((X((s.rpc=WF)|(s.rpc=NOK)))V(s.rpc=SA))))&((G((s.rpc=RTS)->((X((s.rpc=WF)|(s.rpc=NOK)))V(s.rpc=RTS))))&(G((s.rpc=NOK)->((X(s.rpc=WF))V(s.rpc=NOK))))))))

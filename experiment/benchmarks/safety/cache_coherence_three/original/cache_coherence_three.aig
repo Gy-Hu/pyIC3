@@ -1,0 +1,150 @@
+aig 741 10 62 0 669 1
+150
+356
+360 1
+388 1
+405 1
+419
+427 1
+434 1
+442
+448
+508
+542
+548 1
+555
+60 1
+62
+562 1
+576
+582
+661
+753
+778 1
+780
+784
+818
+824 1
+831
+845
+859
+873
+909 1
+923
+931 1
+936
+938
+940
+950
+1008
+1087
+1175
+106 1
+108
+1253
+1341
+1374
+1380 1
+1387
+90
+98 1
+100
+1392
+1396
+1400 1
+1406 1
+1408
+1414
+1420 1
+1424 1
+1429
+1445 1
+1459
+1467 1
+1483
+P,xIGbHfXV_^Ux{[]b+	w^%. p!ÇVÖCπ&BH3	¡+85%>*ﬂihutﬁúEé√í»˜ÃõöóîÄê{ü
+6 ~û‹C74;:§'”SçVå∫>ƒ]◊≤ﬁ›€„ËË›Ùı"%€%‹*-Ÿóp©CõÒ,Ù§∫Z˛†∆∫-öï∞|ôú∑∂≥∞å¢¨ôª
+äö†ò&ì1.54ˇVÀ <î®¬ú»˙Ú
+mà¨)qÚ≤∂G‡√!øZ
+Ü[±ÍÇíöùs¨†≠àö¸¡©í∏Ãƒî*≥¬‚„ÈÃ—œ›Ø±+Ã®∫™≠Øø÷ëÏÒ«´ÛÅı˚–ó
+J>ûñÊ(Ö±Áöü}ù´ø‡ø§«∏ãç)®$ìUñT¬§á≥¯¿ıÛ )ãA≥˜´Óàê¯å˛¨ò
+“¿V˛¡Ó
+ﬁŒTäœ¸
+Í‹Rñ›ä
+ìòòùõçaê`»®çÌ¶µ∏π≥)ú±ÂÊ¯p…™'®%–”ñÆ∞⁄«¶õŒ≠¨©¶Ä§¢è±
+Ùé¢Û˚/,32Åà6àÄ«'ﬁ ◊∞ú§Îï>∫∫ˆÓ≤*gÆ>åç•ˆ˚;˘á¡¬Ä“ˆ^aˇ›äá“õ{›ù´‡?·¯¡
+J>»¿Ñ(π€£ƒ…9«’ä@™Ì¨ﬁ
+ôòÿ «ÁÇÙ∂Ìﬂ‹˝˙¯ÓëÀ.Ññúî¨*°‰.≤≥µú°Kü≠ó	¯!∫¯ÜñôÂ◊ƒÛà	¡≥€√—ñ	/ó	¬Á
+J>ÓÊ˛(ÛÅ≥ÍÔIÌ˚¿	0–ì	“Ñ	
+Ô	Œ	#í µ	«	¿	Ü¿‚	Ä‘Üˆﬁ	
+Ô	"Æ¿ˆ	"ƒÙ	πÀÆ…˛	WÌ	÷öÅÄÑÖ
+/·è
+@∑
+Ö
+ä
+ä
+ïû°ıñ
+ó
+£¨ØÛØÙ¥∑ÒÁ%ÈÓ!Îì		i0 clk
+l0 pcacheC.write
+l1 pcacheC.update
+l2 pcacheC.read
+l3 pcacheC.proc.valid
+l4 pcacheC.proc.count[2]
+l5 pcacheC.proc.count[1]
+l6 pcacheC.proc.count[0]
+l7 pcacheC.miss
+l8 pcacheC.inv_out
+l9 pcacheB.write
+l10 pcacheB.update
+l11 pcacheB.snoop_type[2]
+l12 pcacheB.snoop_type[1]
+l13 pcacheB.snoop_type[0]
+l14 pcacheB.state[1]
+l15 pcacheB.state[0]
+l16 pcacheB.miss
+l17 bus_arbiter.invalidate
+l18 pcacheB.inv_out
+l19 pcacheB.next_state[1]
+l20 pcacheB.next_state[0]
+l21 pcacheB.proc.valid
+l22 pcacheC.bus_req
+l23 bus_arbiter.bus_ackC
+l24 pcacheC.snoop_type[2]
+l25 pcacheC.snoop_type[1]
+l26 pcacheC.snoop_type[0]
+l27 bus_arbiter.shared_snoop[2]
+l28 bus_arbiter.shared_snoop[1]
+l29 bus_arbiter.shared_snoop[0]
+l30 pcacheA.proc.count[2]
+l31 pcacheA.proc.count[1]
+l32 pcacheA.proc.count[0]
+l33 pcacheB.hit
+l34 pcacheA.bus_req
+l35 bus_arbiter.bus_ackB
+l36 pcacheA.hit
+l37 pcacheA.update
+l38 pcacheA.next_state[1]
+l39 pcacheA.next_state[0]
+l40 pcacheC.state[1]
+l41 pcacheC.state[0]
+l42 pcacheC.next_state[1]
+l43 pcacheC.next_state[0]
+l44 pcacheA.snoop_type[2]
+l45 pcacheA.snoop_type[1]
+l46 pcacheA.snoop_type[0]
+l47 bus_arbiter.bus_ackA
+l48 pcacheA.state[1]
+l49 pcacheA.state[0]
+l50 pcacheA.inv_out
+l51 pcacheA.write
+l52 pcacheB.read
+l53 pcacheA.miss
+l54 pcacheB.bus_req
+l55 pcacheC.hit
+l56 pcacheA.proc.valid
+l57 pcacheA.read
+l58 bus_arbiter.is_snoop
+l59 pcacheB.proc.count[2]
+l60 pcacheB.proc.count[1]
+l61 pcacheB.proc.count[0]
