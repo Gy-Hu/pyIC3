@@ -1,6 +1,6 @@
 {
-  "code": "hints = [\n    word_neq(\"crc\", 2863311530),\n]\n",
-  "hint_count": 1,
+  "code": "hints = [\n    word_neq(\"crc\", 0xAAAAAAAA),\n    word_neq(\"crc\", 0x55555555),\n    word_neq(\"crc\", 0x00000000),\n    word_neq(\"crc\", 0xAAAAAAAB),\n    word_neq(\"crc\", 0xAAAAAAA8),\n    word_neq(\"crc\", 0xAAAAAAAA),\n    word_neq(\"crc\", 0x2AAAAAAA),\n    word_neq(\"crc\", 0xEAAAAAAA),\n    word_neq(\"crc\", 0xAAAAAA2A),\n    word_neq(\"crc\", 0xAAAAAAAA),\n    word_neq(\"crc\", 0xAAAAAAAA),\n    word_neq(\"crc\", 0x00000001),\n    word_neq(\"crc\", 0xFFFFFFFE),\n    word_neq(\"crc\", 0x80000000),\n    word_neq(\"crc\", 0x7FFFFFFF),\n    word_neq(\"crc\", 0xAAAAAAAA),\n    word_neq(\"crc\", 0xAAAAAAAA),\n    word_neq(\"crc\", 0xAAAAAAAA),\n]\n",
+  "hint_count": 18,
   "metadata": {
     "model": "claude-sonnet-4-6",
     "source": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_CRC/original/main.sv"

@@ -3,115 +3,115 @@
     "name": "client_server",
     "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/client_server/data/client_server.aag",
     "hint_source": "llm",
-    "hint_gen_time": 11.658,
+    "hint_gen_time": 7.162,
     "hint_metadata": {
       "model": "claude-sonnet-4-6"
     },
-    "hints_generated": 20,
-    "hints_injected": 20,
+    "hints_generated": 24,
+    "hints_injected": 24,
     "status": "ok",
     "verdict": "safe",
-    "time": 0.028,
+    "time": 0.033,
     "frames": 3,
-    "sat_calls": 67,
-    "wall": 11.703,
-    "wall_outer": 11.849
-  },
-  {
-    "name": "cache_coherence_three",
-    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_three/data/cache_coherence_three.aag",
-    "hint_source": "llm",
-    "hint_gen_time": 24.024,
-    "hint_metadata": {
-      "model": "claude-sonnet-4-6"
-    },
-    "hints_generated": 0,
-    "hints_injected": null,
-    "status": "ok",
-    "verdict": "safe",
-    "time": 1.273,
-    "frames": 4,
-    "sat_calls": 476,
-    "wall": 25.454,
-    "wall_outer": 25.603
-  },
-  {
-    "name": "h_Arbiter",
-    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Arbiter/data/h_Arbiter.aag",
-    "hint_source": "llm",
-    "hint_gen_time": 26.643,
-    "hint_metadata": {
-      "model": "claude-sonnet-4-6"
-    },
-    "hints_generated": 32,
-    "hints_injected": 32,
-    "status": "ok",
-    "verdict": "safe",
-    "time": 0.118,
-    "frames": 4,
-    "sat_calls": 167,
-    "wall": 26.799,
-    "wall_outer": 26.94
+    "sat_calls": 79,
+    "wall": 7.211,
+    "wall_outer": 7.347
   },
   {
     "name": "h_CRC",
     "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_CRC/data/h_CRC.aag",
     "hint_source": "llm",
-    "hint_gen_time": 25.738,
-    "hint_metadata": {
-      "model": "claude-sonnet-4-6"
-    },
-    "hints_generated": 20,
-    "hints_injected": 1,
-    "status": "ok",
-    "verdict": "unsafe",
-    "time": 1.809,
-    "frames": 4,
-    "sat_calls": 776,
-    "wall": 27.634,
-    "wall_outer": 27.789
-  },
-  {
-    "name": "cache_coherence_two",
-    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_two/data/cache_coherence_two.aag",
-    "hint_source": "llm",
-    "hint_gen_time": 27.718,
+    "hint_gen_time": 6.631,
     "hint_metadata": {
       "model": "claude-sonnet-4-6"
     },
     "hints_generated": 18,
-    "hints_injected": 18,
+    "hints_injected": 17,
+    "status": "ok",
+    "verdict": "unsafe",
+    "time": 2.375,
+    "frames": 4,
+    "sat_calls": 967,
+    "wall": 9.097,
+    "wall_outer": 9.235
+  },
+  {
+    "name": "h_Arbiter",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Arbiter/data/h_Arbiter.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 12.064,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 25,
+    "hints_injected": 25,
     "status": "ok",
     "verdict": "safe",
-    "time": 0.285,
+    "time": 0.126,
     "frames": 4,
-    "sat_calls": 153,
-    "wall": 28.112,
-    "wall_outer": 28.261
+    "sat_calls": 156,
+    "wall": 12.228,
+    "wall_outer": 12.365
+  },
+  {
+    "name": "h_Dekker",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Dekker/data/h_Dekker.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 12.067,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 25,
+    "hints_injected": 25,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 0.429,
+    "frames": 8,
+    "sat_calls": 511,
+    "wall": 12.533,
+    "wall_outer": 12.67
   },
   {
     "name": "h_FIFO",
     "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_FIFO/data/h_FIFO.aag",
     "hint_source": "llm",
-    "hint_gen_time": 25.922,
+    "hint_gen_time": 8.153,
     "hint_metadata": {
       "model": "claude-sonnet-4-6"
     },
-    "hints_generated": 26,
-    "hints_injected": 24,
+    "hints_generated": 24,
+    "hints_injected": 20,
     "status": "ok",
     "verdict": "unsafe",
-    "time": 3.023,
+    "time": 5.316,
     "frames": 5,
-    "sat_calls": 1125,
-    "wall": 29.028,
-    "wall_outer": 29.164
+    "sat_calls": 1869,
+    "wall": 13.546,
+    "wall_outer": 13.691
+  },
+  {
+    "name": "cache_coherence_two",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_two/data/cache_coherence_two.aag",
+    "hint_source": "llm",
+    "hint_gen_time": 12.042,
+    "hint_metadata": {
+      "model": "claude-sonnet-4-6"
+    },
+    "hints_generated": 25,
+    "hints_injected": 25,
+    "status": "ok",
+    "verdict": "safe",
+    "time": 1.752,
+    "frames": 7,
+    "sat_calls": 903,
+    "wall": 13.901,
+    "wall_outer": 14.04
   },
   {
     "name": "toy_lock_4",
     "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/toy_lock_4/data/toy_lock_4.aag",
     "hint_source": "cached",
-    "hint_load_time": 0.046,
+    "hint_load_time": 0.045,
     "hint_metadata": {
       "model": "claude-opus-4-6",
       "attempt": 4,
@@ -127,79 +127,79 @@
     "frames": 3,
     "sat_calls": 199,
     "wall": 1.609,
-    "wall_outer": 1.732
+    "wall_outer": 1.733
   },
   {
-    "name": "h_Dekker",
-    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Dekker/data/h_Dekker.aag",
+    "name": "cache_coherence_three",
+    "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_three/data/cache_coherence_three.aag",
     "hint_source": "llm",
-    "hint_gen_time": 33.297,
+    "hint_gen_time": 15.18,
     "hint_metadata": {
       "model": "claude-sonnet-4-6"
     },
-    "hints_generated": 16,
-    "hints_injected": 16,
+    "hints_generated": 22,
+    "hints_injected": 21,
     "status": "ok",
     "verdict": "safe",
-    "time": 0.035,
-    "frames": 3,
-    "sat_calls": 55,
-    "wall": 33.368,
-    "wall_outer": 33.515
+    "time": 1.301,
+    "frames": 4,
+    "sat_calls": 459,
+    "wall": 16.635,
+    "wall_outer": 16.777
   },
   {
     "name": "sw_state_machine",
     "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/sw_state_machine/data/sw_state_machine.aag",
     "hint_source": "llm",
-    "hint_gen_time": 26.9,
+    "hint_gen_time": 7.876,
     "hint_metadata": {
       "model": "claude-sonnet-4-6"
     },
-    "hints_generated": 0,
-    "hints_injected": null,
+    "hints_generated": 25,
+    "hints_injected": 25,
     "status": "ok",
     "verdict": "safe",
-    "time": 1.013,
+    "time": 1.465,
     "frames": 7,
-    "sat_calls": 422,
-    "wall": 28.034,
-    "wall_outer": 28.156
+    "sat_calls": 607,
+    "wall": 9.464,
+    "wall_outer": 9.592
   },
   {
     "name": "h_Vending",
     "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Vending/data/h_Vending.aag",
     "hint_source": "llm",
-    "hint_gen_time": 33.943,
+    "hint_gen_time": 12.339,
     "hint_metadata": {
       "model": "claude-sonnet-4-6"
     },
     "hints_generated": 25,
-    "hints_injected": 22,
+    "hints_injected": 19,
     "status": "ok",
     "verdict": "safe",
-    "time": 9.514,
+    "time": 5.329,
     "frames": 14,
-    "sat_calls": 4869,
-    "wall": 43.596,
-    "wall_outer": 43.72
+    "sat_calls": 2691,
+    "wall": 17.81,
+    "wall_outer": 17.937
   },
   {
     "name": "h_TreeArb",
     "aag": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_TreeArb/data/h_TreeArb.aag",
     "hint_source": "llm",
-    "hint_gen_time": 23.511,
+    "hint_gen_time": 9.224,
     "hint_metadata": {
       "model": "claude-sonnet-4-6"
     },
-    "hints_generated": 0,
-    "hints_injected": null,
+    "hints_generated": 25,
+    "hints_injected": 25,
     "status": "ok",
     "verdict": "safe",
-    "time": 53.229,
-    "frames": 15,
-    "sat_calls": 18404,
-    "wall": 76.912,
-    "wall_outer": 77.034
+    "time": 25.831,
+    "frames": 12,
+    "sat_calls": 10082,
+    "wall": 35.227,
+    "wall_outer": 35.362
   },
   {
     "name": "Heap",
@@ -226,10 +226,10 @@
     "hints_injected": 21,
     "status": "ok",
     "verdict": "safe",
-    "time": 90.511,
+    "time": 91.979,
     "frames": 22,
     "sat_calls": 31196,
-    "wall": 90.602,
-    "wall_outer": 90.755
+    "wall": 92.068,
+    "wall_outer": 92.208
   }
 ]

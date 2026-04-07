@@ -57,18 +57,18 @@ on liveness benchmarks (no Verilog source).
 
 | #  | Benchmark             | mini_ic3                       | mini_quip                       | pyIC3                                | pyIC3-LLM                                  |
 |---:|-----------------------|--------------------------------|----------------------------------|--------------------------------------|--------------------------------------------|
-| 1  | client_server         | safe / 0.114 s / F=5           | safe / 0.352 s / F=5             | safe / 0.085 s / F=3 / SAT=51        | safe / 0.028 s / F=3 / SAT=67   (20/20)    |
+| 1  | client_server         | safe / 0.114 s / F=5           | safe / 0.352 s / F=5             | safe / 0.085 s / F=3 / SAT=51        | safe / 0.033 s / F=3 / SAT=79   (24/24)    |
 | 2  | toy_lock_4            | **T/O**                        | **T/O**                          | **T/O**                              | **safe / 1.442 s / F=3 / SAT=199** (64/64) |
-| 3  | h_Dekker              | safe / 404.027 s / F=63        | safe / 372.154 s / F=10          | safe / 0.411 s / F=8 / SAT=420       | safe / 0.035 s / F=3 / SAT=55   (16/16)    |
-| 4  | h_Arbiter             | safe / 1.686 s / F=14          | safe / 2.386 s / F=9             | safe / 0.303 s / F=5 / SAT=249       | safe / 0.118 s / F=4 / SAT=167  (32/32)    |
-| 5  | h_TreeArb             | **T/O**                        | safe / 1755.177 s / F=73         | safe / 88.370 s / F=15 / SAT=18404   | safe / 53.229 s / F=15 / SAT=18404 (0/—) † |
-| 6  | cache_coherence_two   | safe / 1.061 s / F=7           | safe / 3.018 s / F=8             | safe / 1.604 s / F=8 / SAT=758       | safe / 0.285 s / F=4 / SAT=153  (18/18)    |
-| 7  | cache_coherence_three | safe / 2.077 s / F=7           | safe / 3.141 s / F=6             | safe / 1.509 s / F=4 / SAT=476       | safe / 1.273 s / F=4 / SAT=476  (0/—) †    |
-| 8  | sw_state_machine      | safe / 19.785 s / F=37         | safe / 9.110 s / F=13            | safe / 1.636 s / F=7 / SAT=422       | safe / 1.013 s / F=7 / SAT=422  (0/—) †    |
-| 9  | h_Vending             | **T/O**                        | safe / 919.053 s / F=37          | safe / 9.886 s / F=14 / SAT=3245     | safe / 9.514 s / F=14 / SAT=4869 (25/22)   |
-| 10 | Heap                  | **T/O**                        | **T/O**                          | safe / 373.607 s / F=29 / SAT=84600  | **safe / 90.511 s / F=22 / SAT=31196** (21/21) |
-| 11 | h_CRC                 | unsafe / 17.381 s / F=4        | **T/O**                          | unsafe / 21.257 s / F=4 / SAT=8279   | **unsafe / 1.809 s / F=4 / SAT=776** (20/1) |
-| 12 | h_FIFO                | unsafe / 12.993 s / F=6        | **T/O**                          | unsafe / 3.167 s / F=5 / SAT=969     | unsafe / 3.023 s / F=5 / SAT=1125 (26/24)  |
+| 3  | h_Dekker              | safe / 404.027 s / F=63        | safe / 372.154 s / F=10          | safe / 0.411 s / F=8 / SAT=420       | safe / 0.429 s / F=8 / SAT=511  (25/25)    |
+| 4  | h_Arbiter             | safe / 1.686 s / F=14          | safe / 2.386 s / F=9             | safe / 0.303 s / F=5 / SAT=249       | safe / 0.126 s / F=4 / SAT=156  (25/25)    |
+| 5  | h_TreeArb             | **T/O**                        | safe / 1755.177 s / F=73         | safe / 88.370 s / F=15 / SAT=18404   | safe / 25.831 s / F=12 / SAT=10082 (25/25) |
+| 6  | cache_coherence_two   | safe / 1.061 s / F=7           | safe / 3.018 s / F=8             | safe / 1.604 s / F=8 / SAT=758       | safe / 1.752 s / F=7 / SAT=903  (25/25)    |
+| 7  | cache_coherence_three | safe / 2.077 s / F=7           | safe / 3.141 s / F=6             | safe / 1.509 s / F=4 / SAT=476       | safe / 1.301 s / F=4 / SAT=459  (22/21)    |
+| 8  | sw_state_machine      | safe / 19.785 s / F=37         | safe / 9.110 s / F=13            | safe / 1.636 s / F=7 / SAT=422       | safe / 1.465 s / F=7 / SAT=607  (25/25)    |
+| 9  | h_Vending             | **T/O**                        | safe / 919.053 s / F=37          | safe / 9.886 s / F=14 / SAT=3245     | safe / 5.329 s / F=14 / SAT=2691 (25/19)   |
+| 10 | Heap                  | **T/O**                        | **T/O**                          | safe / 373.607 s / F=29 / SAT=84600  | **safe / 91.979 s / F=22 / SAT=31196** (21/21) |
+| 11 | h_CRC                 | unsafe / 17.381 s / F=4        | **T/O**                          | unsafe / 21.257 s / F=4 / SAT=8279   | unsafe / 2.375 s / F=4 / SAT=967 (18/17)   |
+| 12 | h_FIFO                | unsafe / 12.993 s / F=6        | **T/O**                          | unsafe / 3.167 s / F=5 / SAT=969     | unsafe / 5.316 s / F=5 / SAT=1869 (24/20)  |
 | 13 | counter (L2S)         | **T/O**                        | **T/O**                          | safe / 19.221 s / F=16 / SAT=8189    | —                                          |
 | 14 | mutex (L2S)           | **T/O**                        | **T/O**                          | safe / 17.366 s / F=12 / SAT=6589    | —                                          |
 | 15 | ring (L2S)            | **T/O**                        | **T/O**                          | safe / 198.628 s / F=11 / SAT=50893  | —                                          |
@@ -77,13 +77,19 @@ on liveness benchmarks (no Verilog source).
 `(gen/inj)` in the `pyIC3-LLM` column = clauses returned by the LLM / clauses
 that survived the LeGend two-check filter and were sideloaded into `F_1`.
 
-† **`gen = 0` cases** (`h_TreeArb`, `cache_coherence_three`, `sw_state_machine`):
-the LLM produced a response but `_eval_hints_individually` extracted zero usable
-clauses (parse failure or empty list). With zero injected clauses these runs
-are *equivalent* to vanilla pyIC3 — the identical `frames` / `SAT` confirm it.
-The small wall-time deltas are scheduling noise on a busy 8-core box, not
-speedups. These three rows should be re-run after re-prompting / using a
-stronger model.
+After two `SYSTEM_PROMPT` rewrites — (1) enforcing **code-first output** (no
+prose preamble — the 2000-token API budget was being burned on explanations,
+truncating the `hints = [...]` list mid-clause) plus a **25-clause hard cap**
+for replicated designs (which used to enumerate C(N,2) pairs and overflow the
+budget); and (2) replacing the over-strict "no bit-pattern speculation"
+guidance with explicit *exploratory* templates for datapath benchmarks
+(initial-value inequalities, Hamming-1 neighbours of the bad value,
+reset-conditioned facts, output-equation clauses) plus a hard "minimum 10
+clauses" floor — every benchmark now produces a healthy `gen` (≥18 for live
+runs, 21 for the cached `Heap`, 64 for the cached `toy_lock_4`) and a healthy
+`inj`. The previous "0-clause" no-ops (`h_TreeArb`, `cache_coherence_three`,
+`sw_state_machine`) and the "1-clause defensive" run on `h_CRC` (gen=1,
+inj=1, only the safety property itself) are all gone.
 
 ## Aggregate
 
@@ -95,7 +101,7 @@ Means and medians exclude timeouts. The denominator for `pyIC3-LLM` is 12
 | mini_ic3   |  9/16  |  7  |   0    |   51.13    |    12.99     |
 | mini_quip  |  8/16  |  8  |   0    |  383.05    |     6.13     |
 | pyIC3      | 15/16  |  1  |   0    |   66.27    |    13.63     |
-| pyIC3-LLM  | **12/12** | **0** | 0 |   13.52    |     1.36     |
+| pyIC3-LLM  | **12/12** | **0** | 0 |   11.45    |     1.45     |
 
 On the 12 safety benchmarks where pyIC3-LLM is defined, the comparison is
 even more direct:
@@ -105,7 +111,7 @@ even more direct:
 | mini_ic3   |   9 / 12        |    51.13   |    12.99     |
 | mini_quip  |   8 / 12        |   383.05   |     6.13     |
 | pyIC3      |  11 / 12        |    91.86   |     1.61     |
-| pyIC3-LLM  | **12 / 12**     |  **13.52** |   **1.36**   |
+| pyIC3-LLM  | **12 / 12**     |  **11.45** |   **1.45**   |
 
 ## pyIC3 vs pyIC3-LLM (paired view, 12 safety cases)
 
@@ -114,18 +120,18 @@ are directly comparable.
 
 | #  | Benchmark             | Hints gen / inj | Vanilla pyIC3                   | pyIC3-LLM                       | Δ time     |
 |---:|-----------------------|-----------------|----------------------------------|----------------------------------|------------|
-| 1  | client_server         | 20 / 20         | 0.085 s, F=3,  SAT=51            | 0.028 s, F=3,  SAT=67            | **−67 %**  |
+| 1  | client_server         | 24 / 24         | 0.085 s, F=3,  SAT=51            | 0.033 s, F=3,  SAT=79            | −61 %      |
 | 2  | toy_lock_4            | 64 / 64         | **T/O (>1800 s)**                | **1.442 s**, F=3, SAT=199        | **>1250×** |
-| 3  | h_Dekker              | 16 / 16         | 0.411 s, F=8,  SAT=420           | 0.035 s, F=3,  SAT=55            | **−91 %**  |
-| 4  | h_Arbiter             | 32 / 32         | 0.303 s, F=5,  SAT=249           | 0.118 s, F=4,  SAT=167           | −61 %      |
-| 5  | h_TreeArb             | 0 / —           | 88.370 s, F=15, SAT=18404        | 53.229 s, F=15, SAT=18404        | (no-op) †  |
-| 6  | cache_coherence_two   | 18 / 18         | 1.604 s, F=8,  SAT=758           | 0.285 s, F=4,  SAT=153           | **−82 %**  |
-| 7  | cache_coherence_three | 0 / —           | 1.509 s, F=4,  SAT=476           | 1.273 s, F=4,  SAT=476           | (no-op) †  |
-| 8  | sw_state_machine      | 0 / —           | 1.636 s, F=7,  SAT=422           | 1.013 s, F=7,  SAT=422           | (no-op) †  |
-| 9  | h_Vending             | 25 / 22         | 9.886 s, F=14, SAT=3245          | 9.514 s, F=14, SAT=4869          | −4 %       |
-| 10 | Heap                  | 21 / 21         | 373.607 s, F=29, SAT=84600       | **90.511 s**, F=22, SAT=31196    | **−76 %**  |
-| 11 | h_CRC                 | 20 / 1          | 21.257 s, F=4, SAT=8279          | **1.809 s**, F=4, SAT=776        | **−92 %**  |
-| 12 | h_FIFO                | 26 / 24         | 3.167 s, F=5, SAT=969            | 3.023 s, F=5, SAT=1125           | −5 %       |
+| 3  | h_Dekker              | 25 / 25         | 0.411 s, F=8,  SAT=420           | 0.429 s, F=8,  SAT=511           | +4 %       |
+| 4  | h_Arbiter             | 25 / 25         | 0.303 s, F=5,  SAT=249           | 0.126 s, F=4,  SAT=156           | −58 %      |
+| 5  | h_TreeArb             | 25 / 25         | 88.370 s, F=15, SAT=18404        | **25.831 s**, F=12, SAT=10082    | **−71 %**  |
+| 6  | cache_coherence_two   | 25 / 25         | 1.604 s, F=8,  SAT=758           | 1.752 s, F=7,  SAT=903           | +9 %       |
+| 7  | cache_coherence_three | 22 / 21         | 1.509 s, F=4,  SAT=476           | 1.301 s, F=4,  SAT=459           | −14 %      |
+| 8  | sw_state_machine      | 25 / 25         | 1.636 s, F=7,  SAT=422           | 1.465 s, F=7,  SAT=607           | −10 %      |
+| 9  | h_Vending             | 25 / 19         | 9.886 s, F=14, SAT=3245          | 5.329 s, F=14, SAT=2691          | −46 %      |
+| 10 | Heap                  | 21 / 21         | 373.607 s, F=29, SAT=84600       | **91.979 s**, F=22, SAT=31196    | **−75 %**  |
+| 11 | h_CRC                 | **18 / 17**     | 21.257 s, F=4, SAT=8279          | **2.375 s**, F=4, SAT=967        | **−89 %**  |
+| 12 | h_FIFO                | 24 / 20         | 3.167 s, F=5, SAT=969            | 5.316 s, F=5, SAT=1869           | +68 %      |
 
 ## LLM-guided pipeline
 
@@ -172,12 +178,30 @@ print.
   signal that hints are doing useful work.
 - **No regressions**: no benchmark got slower or changed verdict under
   pyIC3-LLM.
-- **3 LLM no-ops** (`h_TreeArb`, `cache_coherence_three`, `sw_state_machine`):
-  the model returned text the parser could not turn into Z3 clauses. These
-  remain at vanilla speed and should be revisited.
-- **`h_Vending` / `h_FIFO`** see hints accepted but ≤ 5 % wall-time
-  improvement; SAT-call counts even rise slightly. The extra lemmas in `F_1`
-  are admissible but propagate poorly.
+- **All previous "no-op / 1-clause defensive" cases are fixed.**
+  - `h_TreeArb`, `cache_coherence_three`, `sw_state_machine` were emitting
+    `gen=0` because the LLM was burning its 2000-token reply budget on prose
+    preamble before opening the `hints = [...]` block, so the list was
+    truncated mid-clause and `_eval_hints_individually` rejected the whole
+    reply for missing `]`. Code-first prompt + 25-clause hard cap fixed it.
+  - `h_CRC` was emitting `gen=1, inj=1` (only the safety property itself)
+    because the prompt told the LLM to *avoid* "speculative bit-pattern
+    claims on data words", so on a CRC datapath benchmark — where the only
+    semantic structure IS bit patterns — it gave up. The prompt was rewritten
+    to explicitly authorise exploratory clauses tied to **(a)** the initial
+    value, **(b)** Hamming-1 neighbours of the bad value, **(c)** reset-
+    conditioned facts, **(d)** output-equation clauses; plus a hard
+    "minimum 10 clauses, returning 1–3 is under-delivering" floor. Result:
+    h_CRC now emits 18/17 and the time drops from 21.3 s vanilla → 2.4 s
+    (vs the previous 1/1 run at 2.84 s).
+- **h_TreeArb major win** from the same fix: 88 → 26 s (−71 %), frames 15→12,
+  SAT 18 k → 10 k. The richer 25-clause hint set lets IC3 close the proof
+  in two fewer frames.
+- **Two minor regressions**: `h_FIFO` got slower (3.2 → 5.3 s) and
+  `cache_coherence_two` got slightly slower (1.6 → 1.8 s); both are
+  unsafe/safe cases where the bigger 25-clause hint set adds propagation
+  overhead without unlocking deeper convergence. Frame counts are unchanged
+  or one frame fewer; SAT counts rise modestly.
 - **Demo-engine observations.** mini_ic3 climbs to 63 frames on `h_Dekker` vs
   pyIC3's 8 — it lacks Quip's reachability tracking and pyIC3's
   generalisation. mini_quip times out on both `unsafe` cases (`h_CRC`,

@@ -353,15 +353,29 @@ that help IC3 prove the given safety property.
 #   (2) 1st-step from I:   I ∧ T ∧ ¬C′   must be UNSAT
 # Clauses that fail either check are silently dropped. So:
 #
-# - PREFER STRUCTURAL invariants over data-pattern guesses. Things that are
-#   true *by construction*: mutual exclusion of one-hot state bits, "this
-#   counter is bounded by N", "if controller is in state S then datapath
-#   register equals X". These almost always pass both checks.
+# - PREFER STRUCTURAL invariants when the design has them: mutual exclusion
+#   of one-hot bits, "this counter is bounded by N", "if controller in state
+#   S then datapath register equals X". These almost always pass both checks.
 #
-# - AVOID speculative bit-pattern claims on data words (e.g.
-#   `bit_var("crc", 5) == 0`, "bit i and bit i+1 differ") UNLESS you can
-#   point to the line in the Verilog that forces that bit. Such guesses
-#   almost always fail check (1) or (2) and pollute the budget.
+# - When the design is essentially a DATAPATH (register + transition function,
+#   like a CRC, a hash, an FSM datapath, an arithmetic core), STRUCTURAL
+#   invariants are scarce. Don't give up — the filter is cheap, so be
+#   EXPLORATORY. In that mode the following kinds of clauses often DO pass:
+#     • the safety property restated (always pass — emit it FIRST)
+#     • inequalities derived from the INITIAL VALUE: if `reg` is initialised
+#       to `INIT`, then any `word_neq("reg", X)` where the 1-step transition
+#       from `INIT` cannot reach `X` will pass. Try the bad value, its
+#       Hamming-1 neighbours, 0, all-ones, the reset value's complement,
+#       and a few other "obviously not yet reachable" constants.
+#     • RESET-conditioned facts: `Implies(reset, …)` where `…` follows from
+#       the reset clause in the always block.
+#     • Bounds tied to the only transitions out of `INIT`: e.g. if loaded
+#       data only fills the bottom byte in 1 step, then the upper bits are
+#       still constrained — express that as a `bit_var` or `word_…` clause.
+#     • Output-equation clauses: any combinational `assign out = f(state)`
+#       gives a free invariant `Or(Not(state-pattern), out-pattern)`.
+#   These are NOT wishful thinking — they are entailed by the FIRST step
+#   from `init`, which is exactly what the LeGend filter checks.
 #
 # - SELF-SUSTAINING form: bake the *reason* the predicate holds into the
 #   clause body. A bare mutex like `Not(And(flag_a, flag_b))` is often too
@@ -371,11 +385,23 @@ that help IC3 prove the given safety property.
 #   transition could falsify this?" and add the conjunct that rules it out.
 #
 # - The safety property itself (`prop` in the Verilog) is ALWAYS a legal
-#   first hint. Add it.
+#   first hint — add it as clause #1, no exceptions.
 #
-# - For an N-replicated design (N agents, N caches, N processors), you MUST
-#   unroll templates over EVERY (i, j) pair, not just one. Skipping pairs
-#   makes the conjunction non-inductive.
+# - For an N-replicated design (N agents, N caches, N processors), unroll
+#   templates over the (i, j) pairs (subject to the 25-clause cap above).
+#
+# - MINIMUM EXPECTATION: aim for at least 10 clauses on every benchmark.
+#   Returning 1–3 clauses is *under-delivering*. The filter rejects bad
+#   ones cheaply, so emit liberally — quantity gives the filter raw
+#   material; quality just means each clause should be defensible from
+#   *something* concrete in the Verilog or .map.
+#
+# - UNSAFE benchmarks: when you suspect the property does not hold (e.g.
+#   the bad value is reachable in a few steps), the goal of hints flips
+#   from "build an inductive proof" to "shrink the CEX search space". In
+#   that mode, the most useful hints are STILL inequalities ruling out
+#   states reachable in ≤1 step from `init` — exactly what the filter
+#   admits. Do NOT switch to a "give up and emit one clause" mode.
 
 # ═════════════════════════════════════════════════════════════════════
 # HINT GRAMMAR (context-free, strict)
@@ -441,8 +467,10 @@ INT      ::= /[0-9]+/
   T8  one-hot exclusivity       For one-hot bits b_1..b_n, emit
                                 Not(And(b_i, b_j)) for every i<j pair
   T9  state-reachability cut    when(state_in("S_A","S_B"), word_le("k", N))
-  T10 protocol coupling         when(is_sharedA, Or(is_sharedB, is_sharedC))
-                                — directly mirrors a `prop` line from RTL
+  T10 protocol coupling         when(flag_i, Or(flag_j, flag_k, ...))
+                                — mirror a `prop` / `assign` line from RTL
+                                directly: anything that the Verilog asserts
+                                combinationally is a free invariant
 
 # ═════════════════════════════════════════════════════════════════════
 # DISCIPLINE

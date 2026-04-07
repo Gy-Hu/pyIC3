@@ -1,14 +1,14 @@
 LLM-guided pyIC3: 12 safety cases, workers=8, timeout=1800s
-[1/12] client_server             src=llm    gen=20 inj=20 verdict=safe     time=0.028 F=3 SAT=67
-[2/12] cache_coherence_three     src=llm    gen=0 inj=None verdict=safe     time=1.273 F=4 SAT=476
-[3/12] h_Arbiter                 src=llm    gen=32 inj=32 verdict=safe     time=0.118 F=4 SAT=167
-[4/12] h_CRC                     src=llm    gen=20 inj=1 verdict=unsafe   time=1.809 F=4 SAT=776
-[5/12] cache_coherence_two       src=llm    gen=18 inj=18 verdict=safe     time=0.285 F=4 SAT=153
-[6/12] h_FIFO                    src=llm    gen=26 inj=24 verdict=unsafe   time=3.023 F=5 SAT=1125
+[1/12] client_server             src=llm    gen=24 inj=24 verdict=safe     time=0.033 F=3 SAT=79
+[2/12] h_CRC                     src=llm    gen=18 inj=17 verdict=unsafe   time=2.375 F=4 SAT=967
+[3/12] h_Arbiter                 src=llm    gen=25 inj=25 verdict=safe     time=0.126 F=4 SAT=156
+[4/12] h_Dekker                  src=llm    gen=25 inj=25 verdict=safe     time=0.429 F=8 SAT=511
+[5/12] h_FIFO                    src=llm    gen=24 inj=20 verdict=unsafe   time=5.316 F=5 SAT=1869
+[6/12] cache_coherence_two       src=llm    gen=25 inj=25 verdict=safe     time=1.752 F=7 SAT=903
 [7/12] toy_lock_4                src=cached gen=64 inj=64 verdict=safe     time=1.442 F=3 SAT=199
-[8/12] h_Dekker                  src=llm    gen=16 inj=16 verdict=safe     time=0.035 F=3 SAT=55
-[9/12] sw_state_machine          src=llm    gen=0 inj=None verdict=safe     time=1.013 F=7 SAT=422
-[10/12] h_Vending                 src=llm    gen=25 inj=22 verdict=safe     time=9.514 F=14 SAT=4869
-[11/12] h_TreeArb                 src=llm    gen=0 inj=None verdict=safe     time=53.229 F=15 SAT=18404
-[12/12] Heap                      src=cached gen=21 inj=21 verdict=safe     time=90.511 F=22 SAT=31196
-Total wall: 90.8s -> /Users/huguangyu/coding_env/pyIC3/experiment/llm_results.json
+[8/12] cache_coherence_three     src=llm    gen=22 inj=21 verdict=safe     time=1.301 F=4 SAT=459
+[9/12] sw_state_machine          src=llm    gen=25 inj=25 verdict=safe     time=1.465 F=7 SAT=607
+[10/12] h_Vending                 src=llm    gen=25 inj=19 verdict=safe     time=5.329 F=14 SAT=2691
+[11/12] h_TreeArb                 src=llm    gen=25 inj=25 verdict=safe     time=25.831 F=12 SAT=10082
+[12/12] Heap                      src=cached gen=21 inj=21 verdict=safe     time=91.979 F=22 SAT=31196
+Total wall: 92.3s -> /Users/huguangyu/coding_env/pyIC3/experiment/llm_results.json
