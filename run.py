@@ -21,7 +21,7 @@ import subprocess
 import time
 import sys
 
-from llm_oracle import load_llm_config, AIGERSymbolMap, PredicateEncoder
+from clause_sideloader import load_llm_config, AIGERSymbolMap, PredicateEncoder
 
 _cfg = load_llm_config()
 
@@ -113,7 +113,7 @@ def run_ic3(aag_file, hint_lemmas=None, timeout_sec=300):
 def generate_hints(aag_file, map_file, verilog_file, api_url, api_key, model):
     """Returns (hints_list, raw_response)."""
     import model_encoder
-    from llm_oracle import AIGERSymbolMap, PredicateEncoder, LLMOracle
+    from clause_sideloader import AIGERSymbolMap, PredicateEncoder, LLMOracle
 
     m = model_encoder.Model()
     result = m.parse(aag_file)
@@ -127,7 +127,7 @@ def generate_hints(aag_file, map_file, verilog_file, api_url, api_key, model):
     prop_desc = ("Safety property:\n" + "\n".join(prop_lines)) if prop_lines else "Bad state unreachable."
 
     oracle = LLMOracle(api_url, api_key, model)
-    return oracle.generate_hints(verilog_src, prop_desc, smap, encoder)
+    return oracle.generate_hints(verilog_src, prop_desc, encoder)
 
 
 def fmt_time(r):
@@ -145,7 +145,7 @@ def mode_single(aag, map_file, verilog, timeout, api_url, api_key, model, save_p
     print(f"  {len(hints)} hints in {time.time()-t0:.1f}s")
 
     if save_path and hints:
-        from llm_oracle import save_hints
+        from clause_sideloader import save_hints
         save_hints(hints, raw_code, save_path, metadata={"model": model, "source": verilog})
 
     print(f"Running LLM-guided IC3 (timeout={timeout}s)...")
@@ -320,7 +320,7 @@ def main():
 
     if args.load_hints:
         # Load pre-verified hints and run IC3
-        from llm_oracle import load_hints
+        from clause_sideloader import load_hints
         import model_encoder
         m_ = model_encoder.Model(); r_ = m_.parse(aag_file)
         smap_ = AIGERSymbolMap(map_file); enc_ = PredicateEncoder(smap_, r_[1])

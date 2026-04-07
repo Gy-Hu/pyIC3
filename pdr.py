@@ -160,10 +160,10 @@ class PDR:
 
         self.frames = [Frame(lemmas=[self.init.cube()]), Frame(lemmas=[self.post.cube()])]
 
-        # Inject LLM-generated hint lemmas into frame 1
+        # Sideload LLM-generated candidate clauses into frame 1
         if hint_lemmas:
-            from llm_oracle import verify_and_inject
-            verify_and_inject(self, hint_lemmas, verbose=self.silent)
+            from clause_sideloader import sideload_clauses
+            sideload_clauses(self, hint_lemmas, verbose=not self.silent)
 
         # LLM callback for on-the-fly hint generation (set externally)
         self._llm_callback = None
@@ -624,9 +624,10 @@ class PDR:
             return
 
         self._llm_call_count += 1
-        # Verify and inject new hints into all frames >= 1
-        from llm_oracle import verify_and_inject
-        verify_and_inject(self, new_hints, verbose=True)
+        # Sideload mid-run hints into F_1 (LeGend semantics: sound regardless
+        # of how many frames currently exist).
+        from clause_sideloader import sideload_clauses
+        sideload_clauses(self, new_hints, verbose=True)
 
     def strengthen(self):
         self.status = "OVER-APPROXIMATING" 

@@ -105,13 +105,14 @@ All benchmarks were verified using both **pyIC3** (Python IC3/PDR implementation
 
 ### LLM-Guided IC3 Results
 
-We re-converted all 12 benchmarks via the Yosys `aigmap → aigmove` pipeline (see `experiment/convert_all.sh`) so that every `.aag` ships with a paired RTL-to-AIGER symbol map. An LLM (Claude Sonnet 4.6) reads the original Verilog source and generates candidate invariant predicates. Each candidate is verified by a **three-tier filter** before injection:
+We re-converted all 12 benchmarks via the Yosys `aigmap → aigmove` pipeline (see `experiment/convert_all.sh`) so that every `.aag` ships with a paired RTL-to-AIGER symbol map. An LLM (Claude Sonnet 4.6) reads the original Verilog source and generates candidate invariant clauses. Each candidate is sanity-checked following the **clause-sideloading** discipline of LeGend (Miao, Hu, Zhang, Zhang, 2026; [arxiv:2602.24010](https://arxiv.org/abs/2602.24010), Algorithm 3 and §3.3.2):
 
-- **Tier 0** — *init filter*: `Init ∧ ¬hint` is UNSAT (the hint holds in the initial state). Hints that fail Tier 0 are dropped immediately.
-- **Tier 3** — *joint inductiveness*: `(∧ surviving hints) ∧ Post ∧ T ∧ ¬(∧ surviving hints)'` is UNSAT, in a single SAT call. If Tier 3 passes, the entire batch is injected together.
-- **Tier 2** — *individual fallback*: if Tier 3 fails, fall back to per-hint relative inductiveness `hint ∧ Post ∧ T ∧ ¬hint'` is UNSAT, and inject only the hints that individually pass.
+- **Initiation**: `I ∧ ¬C` is UNSAT — the clause holds in the initial state.
+- **1st-step consistency**: `I ∧ T ∧ ¬C'` is UNSAT — the clause holds after one transition from the initial state.
 
-Verified hints are injected as lemmas into IC3 frames before solving. See `run.py --batch` to reproduce. The verifier lives in `llm_oracle.py:verify_and_inject`.
+A clause that passes both checks satisfies `C ⊇ Reach(≤1)` and is soundly added as a lemma to frame `F_1`. No relative-inductiveness check is performed; IC3's own `PropagateLemmas` pass either pushes the clause forward or quietly leaves it behind, which is harmless. See `run.py --batch` to reproduce. The sideloader lives in `clause_sideloader.py:sideload_clauses`.
+
+> **Note on the experimental tables below.** The numbers were measured against an earlier implementation of the hint verifier that used a three-tier filter (*Initiation → joint relative inductiveness → per-hint relative inductiveness fallback*). That filter has been replaced with the two-check LeGend sideloader described above; the per-benchmark trends (hints helping or hurting, frames/SAT deltas) are still representative, but individual numbers may differ slightly on a rerun. The timeout-case analysis and the Tier 2/3 discussion in *Open problems* similarly reflect the legacy filter and are kept as a record of what motivated the switch to LeGend-style sideloading.
 
 
 | #   | Benchmark             | Generated | Injected | Vanilla               | W/Hints                   | dFrames | dTime      | dSAT     |

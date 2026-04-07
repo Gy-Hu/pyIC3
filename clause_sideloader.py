@@ -1,22 +1,34 @@
 """
-LLM-Guided IC3: Leveraging Language Models for Invariant Hint Generation
-=========================================================================
+Clause Sideloading for LLM-Guided IC3.
 
-Bridges the semantic gap between word-level RTL and bit-level IC3.
+Follows the LeGend (Miao, Hu, Zhang, Zhang, 2026) sideloading discipline:
+candidate clauses are injected into IC3 frame F_1 after passing two
+*sanity checks*; IC3's own propagation is responsible for pushing them
+forward (or letting them die).
 
-Pipeline (Plan A - Pre-analysis):
-  1. Parse AIGER .map file → latch name-to-index mapping
-  2. Call LLM with Verilog source + variable info → candidate invariants
-  3. Encode invariants as Z3 clauses over AIGER latch variables
-  4. Verify hints hold in initial state
-  5. Inject as lemmas into IC3 frames
+    Reference: arxiv:2602.24010, Algorithm 3 and §3.3.2.
 
-This is uniquely enabled by Python: LLM generates Z3 code, we eval() it.
-C++/Rust IC3 implementations cannot do this.
+The two sanity checks (necessary and sufficient for soundly populating F_1):
+
+    (1) Initiation              I ∧ ¬C is UNSAT          (C holds at init)
+    (2) 1st-step consistency    I ∧ T ∧ ¬C' is UNSAT     (C holds after one step)
+
+Together they prove C ⊇ Reach(≤1), which is exactly what F_1 must satisfy.
+No relative-inductiveness check is needed at injection time — non-inductive
+clauses simply fail to propagate beyond F_1 and become harmless.
+
+Module layout:
+    AIGERSymbolMap     parses Yosys aigmap .map files
+    PredicateEncoder   word-level Verilog predicates → bit-level Z3
+    LLMOracle          calls the LLM API to produce candidate clauses
+    sideload_clauses   sanity-checks and injects clauses into F_1
+    save_hints / load_hints   JSON persistence of LLM-generated clauses
 """
 
 import json
 import os
+import re
+
 import requests
 from z3 import *
 
@@ -73,21 +85,18 @@ class AIGERSymbolMap:
 
         # Regroup name[N] patterns into word-level variables.
         # e.g., "c[0]" (bit 0) and "c[1]" (bit 0) → "c" with bits 0, 1
-        import re as _re
         regrouped = {}
         for name, bits in list(self.word_vars.items()):
-            m = _re.match(r'^(.+)\[(\d+)\]$', name)
+            m = re.match(r'^(.+)\[(\d+)\]$', name)
             if m and len(bits) == 1:
                 base = m.group(1)
                 bit_from_name = int(m.group(2))
                 latch_idx, _, is_inv = bits[0]
                 regrouped.setdefault(base, []).append((latch_idx, bit_from_name, is_inv))
-            # else keep as is
         # Merge regrouped into word_vars, remove the name[N] entries
         for base, bits in regrouped.items():
             if base not in self.word_vars:
                 self.word_vars[base] = bits
-                # Remove individual name[N] entries
                 for _, bit_idx, _ in bits:
                     old_key = f"{base}[{bit_idx}]"
                     self.word_vars.pop(old_key, None)
@@ -114,6 +123,9 @@ class AIGERSymbolMap:
 # 2. Predicate Encoder: word-level → bit-level Z3
 # ─────────────────────────────────────────────────────────────────────
 
+_TRAIL_INDEX_RE = re.compile(r'\[\d+(?::\d+)?\]$')
+
+
 class PredicateEncoder:
     """Translates word-level Verilog predicates to Z3 over AIGER latch Bools."""
 
@@ -121,35 +133,36 @@ class PredicateEncoder:
         self.smap = symbol_map
         self.z3_vars = z3_latch_vars  # pdr.literals, indexed by latch order
 
+    def _resolve_word(self, var_name):
+        """Look up bits_info for `var_name`, progressively stripping trailing
+        [n] / [n:m] indices until a known base is found.
+        Returns the bits_info list, or raises ValueError if nothing matches."""
+        bits_info = self.smap.word_vars.get(var_name)
+        if bits_info is not None:
+            return bits_info
+        candidate = var_name
+        while True:
+            stripped = _TRAIL_INDEX_RE.sub('', candidate)
+            if stripped == candidate or not stripped:
+                raise ValueError(f"Unknown variable: {var_name}")
+            candidate = stripped
+            bits_info = self.smap.word_vars.get(candidate)
+            if bits_info is not None:
+                return bits_info
+
     def _get_bits(self, var_name):
         """Get list of (z3_expr_for_true_value, bit_idx) for a word variable."""
-        bits_info = self.smap.word_vars.get(var_name)
-        if bits_info is None:
-            # Progressively strip trailing [n:m] or [n] to find the base variable.
-            # Handles: "pc[0][2:0]" → try "pc[0]" → found!
-            #          "v.state[1:0]" → try "v.state" → found!
-            import re
-            candidate = var_name
-            while bits_info is None:
-                candidate = re.sub(r'\[\d+(?::\d+)?\]$', '', candidate)
-                if candidate == var_name or not candidate:
-                    break
-                bits_info = self.smap.word_vars.get(candidate)
-                var_name = candidate  # for next iteration
-            if bits_info is None:
-                raise ValueError(f"Unknown variable: {var_name}")
+        bits_info = self._resolve_word(var_name)
         result = []
         for latch_idx, bit_idx, is_inv in bits_info:
             z3_var = self.z3_vars[latch_idx]
-            # If invlatch, the AIGER stores NOT(verilog_var), so true value = Not(z3_var)
+            # invlatch stores NOT(verilog_var); true value = Not(z3_var)
             true_val = Not(z3_var) if is_inv else z3_var
             result.append((true_val, bit_idx))
         return result
 
     def bool_var(self, var_name):
         """Get a 1-bit Verilog variable as Z3 Bool expression."""
-        # Handle "name[idx]" pattern: redirect to bit_var
-        import re
         m = re.match(r'^(.+?)\[(\d+)\]$', var_name)
         if m:
             return self.bit_var(m.group(1), int(m.group(2)))
@@ -158,26 +171,21 @@ class PredicateEncoder:
         return bits[0][0]
 
     def word_eq_zero(self, var_name):
-        """var == 0 : all bits are false."""
         return And([Not(b) for b, _ in self._get_bits(var_name)])
 
     def word_neq_zero(self, var_name):
-        """var != 0 : at least one bit is true."""
         return Or([b for b, _ in self._get_bits(var_name)])
 
     def _const_bits(self, width, value):
-        """Return [(BoolVal, bit_idx)] for an integer constant of given width."""
         return [(BoolVal(((value >> i) & 1) == 1), i) for i in range(width)]
 
     def _word_bits_or_const(self, x, ref_width=None):
-        """Accept str (Verilog word name) or int (constant). Return [(bool, bit)]."""
         if isinstance(x, int):
             assert ref_width is not None, "constant needs a width reference"
             return self._const_bits(ref_width, x)
         return self._get_bits(x)
 
     def word_eq(self, var_a, var_b):
-        """var_a == var_b. Either side may be an int constant."""
         if isinstance(var_a, int) and isinstance(var_b, int):
             return BoolVal(var_a == var_b)
         if isinstance(var_a, int):
@@ -188,14 +196,11 @@ class PredicateEncoder:
         return And([a == b for (a, _), (b, _) in zip(bits_a, bits_b)])
 
     def word_neq(self, var_a, var_b):
-        """var_a != var_b. Either side may be an int constant."""
         return Not(self.word_eq(var_a, var_b))
 
     def word_lt(self, var_a, var_b):
-        """Unsigned var_a < var_b. Either side may be an int constant."""
         if isinstance(var_a, int) and isinstance(var_b, int):
             return BoolVal(var_a < var_b)
-        # need a reference width
         ref = var_a if isinstance(var_a, str) else var_b
         ref_width = len(self._get_bits(ref))
         bits_a = self._word_bits_or_const(var_a, ref_width)
@@ -216,19 +221,7 @@ class PredicateEncoder:
 
     def bit_var(self, var_name, bit_idx):
         """Get a specific bit of a multi-bit variable as Z3 Bool."""
-        bits_info = self.smap.word_vars.get(var_name)
-        if bits_info is None:
-            # Same progressive stripping as _get_bits
-            import re
-            candidate = var_name
-            while bits_info is None:
-                candidate = re.sub(r'\[\d+(?::\d+)?\]$', '', candidate)
-                if candidate == var_name or not candidate:
-                    break
-                bits_info = self.smap.word_vars.get(candidate)
-                var_name = candidate
-            if bits_info is None:
-                raise ValueError(f"Unknown variable: {var_name}")
+        bits_info = self._resolve_word(var_name)
         for latch_idx, bidx, is_inv in bits_info:
             if bidx == bit_idx:
                 z3_var = self.z3_vars[latch_idx]
@@ -264,11 +257,9 @@ class PredicateEncoder:
         return Or([self.idx_eq(field, v) for v in vals])
 
     def state_in(self, *labels):
-        """Shortcut: in_set('state', *labels)."""
         return self.in_set('state', *labels)
 
     def state_is(self, label):
-        """Shortcut: idx_eq('state', label) — label may be int or registered name."""
         return self.idx_eq('state', self._resolve_label('state', label))
 
     def build_eval_namespace(self):
@@ -315,7 +306,7 @@ class PredicateEncoder:
 
 
 # ─────────────────────────────────────────────────────────────────────
-# 3. LLM Oracle: calls LLM to generate invariant hints
+# 3. LLM Oracle: calls LLM to generate candidate clauses
 # ─────────────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = r"""You are a formal verification expert specializing in IC3/PDR.
@@ -421,7 +412,7 @@ Generate candidate invariant hints. Return ONLY the Python code block with `hint
 
 
 class LLMOracle:
-    """Calls LLM API to generate invariant hints for IC3."""
+    """Calls LLM API to generate candidate clauses for IC3 sideloading."""
 
     def __init__(self, api_url, api_key, model="claude-opus-4-6"):
         self.api_url = api_url
@@ -451,17 +442,17 @@ class LLMOracle:
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"]
 
-    def generate_hints(self, verilog_source, property_desc, symbol_map, encoder):
+    def generate_hints(self, verilog_source, property_desc, encoder):
         """Full pipeline: LLM → parse → Z3 expressions.
 
-        Evaluates each hint individually so that a single bad reference
-        (e.g., a Verilog macro name like K2) doesn't discard all hints.
+        Each clause is eval'd individually so that a single bad reference
+        (e.g. a Verilog macro name like K2) doesn't discard all clauses.
 
         Returns:
             hints: list of Z3 Bool expressions
-            raw_response: the LLM's raw text (for logging/paper)
+            raw_response: the LLM's raw text (for logging / persistence)
         """
-        summary = symbol_map.summary()
+        summary = encoder.smap.summary()
         raw = self.call_llm(verilog_source, property_desc, summary)
 
         code = _extract_code_block(raw)
@@ -478,12 +469,9 @@ class LLMOracle:
 
 def _eval_hints_individually(code, ns):
     """Parse the hints list from LLM code and eval each element separately."""
-    import re
-    # Extract the list body from "hints = [...]"
     m = re.search(r'hints\s*=\s*\[(.*)\]', code, re.DOTALL)
     if not m:
         return []
-
     body = m.group(1)
     # Strip Python line comments — eval() rejects '#' inside expressions, and
     # human-written hint files (e.g. toy_lock) interleave comments with clauses.
@@ -491,16 +479,14 @@ def _eval_hints_individually(code, ns):
     elements = _split_top_level(body)
 
     valid = []
-    for i, elem in enumerate(elements):
+    for elem in elements:
         elem = elem.strip()
         if not elem:
             continue
         try:
-            result = eval(elem, ns)
-            valid.append(result)
-        except Exception as e:
-            # Skip this hint, continue with others
-            pass
+            valid.append(eval(elem, ns))
+        except Exception:
+            pass  # skip this clause, continue with the rest
     return valid
 
 
@@ -526,130 +512,109 @@ def _split_top_level(text):
 
 def _extract_code_block(text):
     """Extract Python code from markdown code block or raw text."""
-    # Try ```python ... ``` first
-    import re
     m = re.search(r'```python\s*\n(.*?)```', text, re.DOTALL)
     if m:
         return m.group(1)
-    # Try ``` ... ```
     m = re.search(r'```\s*\n(.*?)```', text, re.DOTALL)
     if m:
         return m.group(1)
-    # Assume the whole text is code if it contains 'hints'
     if 'hints' in text:
         return text
     raise ValueError(f"Could not extract code from LLM response:\n{text[:200]}")
 
 
 # ─────────────────────────────────────────────────────────────────────
-# 4. Hint Injection into IC3 Frames
+# 4. Clause sideloading into IC3 frame F_1
 # ─────────────────────────────────────────────────────────────────────
 
-def verify_and_inject(pdr_instance, hints, verbose=True):
-    """Verify hints and inject into IC3 frames.
+def sideload_clauses(pdr_instance, clauses, verbose=True):
+    """LeGend-style clause sideloading.
 
-    Strategy: Tier 0 (init check) → Tier 3 (joint) → fallback Tier 2 (individual).
+    Each candidate clause C (a Z3 BoolExpr) is accepted iff it passes both
+    of the following sanity checks:
 
-      Tier 0: Init ∧ ¬hint is UNSAT              (each hint holds in initial state)
-      Tier 3: (∧ hints) ∧ Post ∧ T ∧ ¬(∧ hints)' is UNSAT  (jointly inductive)
-      Tier 2: hint ∧ Post ∧ T ∧ ¬hint' is UNSAT  (individually relatively inductive)
+        (1) Initiation:            I ∧ ¬C        is UNSAT
+        (2) 1st-step consistency:  I ∧ T ∧ ¬C'   is UNSAT
 
-    Flow:
-      1. Tier 0 filters out hints that violate init.
-      2. Tier 3 checks if ALL remaining hints are jointly inductive (1 SAT call).
-         → Pass: inject all.
-         → Fail: fallback to Tier 2, inject only individually inductive hints.
+    Accepted clauses are appended as lemmas to F_1 *only*. Non-inductive
+    clauses are not filtered here — IC3's PropagateLemmas pass will quietly
+    fail to push them forward, which is harmless.
+
+    The function may be called either before pdr.run() (the standard
+    pre-loaded hint flow) or mid-run from a callback: in both cases F_1
+    already exists and accepting C only requires C ⊇ Reach(≤1), which the
+    two checks establish.
+
+    Args:
+        pdr_instance: a pdr.PDR object whose `frames` list has been initialised
+                      (i.e. `len(frames) >= 2`).
+        clauses:      iterable of Z3 BoolExpr candidate clauses.
+        verbose:      print per-clause accept/reject lines.
 
     Returns:
-        number of successfully injected hints
+        Number of clauses successfully sideloaded.
     """
-    trans = pdr_instance.trans.cube()
-    post = pdr_instance.post.cube()
-    primeMap = pdr_instance.primeMap
-    inp_map = pdr_instance.inp_map
-    init_cube = pdr_instance.init.cube()
-
-    # ── Pre-filter: skip non-Z3 objects (strings, None, etc.) ──────
-    from z3 import is_expr
-    valid_hints = [(i, h) for i, h in enumerate(hints) if is_expr(h)]
-    if len(valid_hints) < len(hints) and verbose:
-        print(f"  Skipped {len(hints) - len(valid_hints)} non-Z3 hints")
-    hints_enum = valid_hints
-
-    # ── Tier 0: filter hints that violate init ───────────────────────
-    init_valid = []
-    rejected_init = 0
-    for i, hint in hints_enum:
-        res = pdr_instance.check_sat(And(init_cube, Not(hint)), return_res=True)
-        if res == unsat:
-            init_valid.append((i, hint))
-        else:
-            rejected_init += 1
-            if verbose:
-                print(f"  [hint {i}] REJECTED (violates init): {_short_repr(hint)}")
-
-    if not init_valid:
-        if verbose:
-            print(f"  → 0/{len(hints)} injected ({rejected_init} failed init)")
-        return 0
-
-    # ── Tier 3: joint inductiveness check (1 SAT call) ───────────────
-    all_hints_conj = And([h for _, h in init_valid])
-    all_hints_conj_prime = substitute(substitute(all_hints_conj, primeMap), inp_map)
-    res3 = pdr_instance.check_sat(
-        And(all_hints_conj, post, trans, Not(all_hints_conj_prime)),
-        return_res=True
+    assert len(pdr_instance.frames) >= 2, (
+        "sideload_clauses: F_1 does not exist yet; call after pdr.frames "
+        "is initialised."
     )
 
-    if res3 == unsat:
-        # Tier 3 passed — all hints are jointly inductive, inject all
-        for idx, hint in init_valid:
-            for fidx in range(1, len(pdr_instance.frames)):
-                pdr_instance.frames[fidx].addLemma(hint, pushed=False)
-            if verbose:
-                print(f"  [hint {idx}] INJECTED (joint): {_short_repr(hint)}")
-        if verbose:
-            print(f"  → {len(init_valid)}/{len(hints)} injected via Tier 3 (jointly inductive), "
-                  f"{rejected_init} failed init")
-        return len(init_valid)
+    init  = pdr_instance.init.cube()
+    trans = pdr_instance.trans.cube()
+    primeMap = pdr_instance.primeMap
+    inp_map  = pdr_instance.inp_map
+    frame_one = pdr_instance.frames[1]
 
-    # ── Tier 3 failed — fallback to Tier 2: individual filtering ─────
-    if verbose:
-        print(f"  Tier 3 failed (not jointly inductive), falling back to Tier 2...")
+    # Defensive: skip non-Z3 entries (None, strings, etc.)
+    valid = [(i, c) for i, c in enumerate(clauses) if is_expr(c)]
+    if verbose and len(valid) < len(clauses):
+        print(f"  Skipped {len(clauses) - len(valid)} non-Z3 entries")
 
     injected = 0
-    rejected_ind = 0
-    for idx, hint in init_valid:
-        hint_prime = substitute(substitute(hint, primeMap), inp_map)
-        res2 = pdr_instance.check_sat(
-            And(hint, post, trans, Not(hint_prime)),
-            return_res=True
+    rejected_init = 0
+    rejected_step = 0
+    for idx, C in valid:
+        # (1) Initiation: I ∧ ¬C must be UNSAT
+        res_init = pdr_instance.check_sat(And(init, Not(C)), return_res=True)
+        if res_init != unsat:
+            rejected_init += 1
+            if verbose:
+                print(f"  [clause {idx}] reject (initiation): {_short_repr(C)}")
+            continue
+
+        # (2) 1st-step consistency: I ∧ T ∧ ¬C' must be UNSAT
+        C_prime = substitute(substitute(C, primeMap), inp_map)
+        res_step = pdr_instance.check_sat(
+            And(init, trans, Not(C_prime)), return_res=True
         )
-        if res2 == unsat:
-            for fidx in range(1, len(pdr_instance.frames)):
-                pdr_instance.frames[fidx].addLemma(hint, pushed=False)
-            injected += 1
+        if res_step != unsat:
+            rejected_step += 1
             if verbose:
-                print(f"  [hint {idx}] INJECTED (individual): {_short_repr(hint)}")
-        else:
-            rejected_ind += 1
-            if verbose:
-                print(f"  [hint {idx}] REJECTED (not relatively inductive): {_short_repr(hint)}")
+                print(f"  [clause {idx}] reject (1st-step): {_short_repr(C)}")
+            continue
+
+        # Both checks passed — sideload into F_1
+        frame_one.addLemma(C, pushed=False)
+        injected += 1
+        if verbose:
+            print(f"  [clause {idx}] sideloaded: {_short_repr(C)}")
 
     if verbose:
-        print(f"  → {injected}/{len(hints)} injected via Tier 2 fallback, "
-              f"{rejected_init} failed init, {rejected_ind} failed inductiveness")
+        print(
+            f"  → {injected}/{len(clauses)} sideloaded "
+            f"({rejected_init} failed initiation, {rejected_step} failed 1st-step)"
+        )
     return injected
 
 
 def _short_repr(expr, max_len=80):
     """Short string repr of a Z3 expression."""
     s = str(expr)
-    return s if len(s) <= max_len else s[:max_len-3] + "..."
+    return s if len(s) <= max_len else s[:max_len - 3] + "..."
 
 
 # ─────────────────────────────────────────────────────────────────────
-# 5. Hint persistence: save/load verified hints
+# 5. Hint persistence: save/load verified clauses
 # ─────────────────────────────────────────────────────────────────────
 
 def save_hints(hints, raw_response, filepath, metadata=None):
@@ -659,12 +624,11 @@ def save_hints(hints, raw_response, filepath, metadata=None):
     On load, the code block is extracted and eval'd with the encoder.
 
     Args:
-        hints: list of Z3 expressions (for counting)
+        hints: list of Z3 expressions (for counting only)
         raw_response: the LLM's full response text
         filepath: output .json path
-        metadata: optional dict (model, iterations, etc.)
+        metadata: optional dict (model, source, enums, ...)
     """
-    import json
     code = _extract_code_block(raw_response)
     data = {
         "code": code,
@@ -687,7 +651,6 @@ def load_hints(filepath, encoder):
         hints: list of Z3 Bool expressions
         metadata: dict
     """
-    import json
     with open(filepath) as f:
         data = json.load(f)
 
@@ -699,8 +662,6 @@ def load_hints(filepath, encoder):
 
     ns = encoder.build_eval_namespace()
     code = data["code"]
-
-    # Always per-hint eval (see generate_hints comment).
     hints = _eval_hints_individually(code, ns)
 
     print(f"  Loaded {len(hints)} hints from {filepath}")
