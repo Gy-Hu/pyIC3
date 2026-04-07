@@ -1,6 +1,6 @@
 # BlockSys Benchmark Evaluation
 
-This directory documents the benchmark evaluation of pyIC3 on 12 safety-property benchmarks selected for the [BlockSys 2026](https://blocksys.info/2026/) (International Conference on Blockchain, Artificial Intelligence, and Trustworthy Systems) research project.
+This document reports the benchmark evaluation of pyIC3 on 12 safety-property benchmarks selected for the [BlockSys 2026](https://blocksys.info/2026/) (International Conference on Blockchain, Artificial Intelligence, and Trustworthy Systems) research project. Working copies of every benchmark live under `experiment/blocksys_benchmarks/safety/<name>/{original,data,auxiliary}/`.
 
 ## Benchmark Selection
 
@@ -48,58 +48,28 @@ All benchmarks are single-property (B=1), pure-safety AIGER files (no justice/fa
 
 ### The Problem
 
-These benchmarks use **AIGER 1.1** format where safety properties are encoded in the **B (bad state) section** of the header (`aag M I L O A B`). However, pyIC3's parser only reads the **O (output) section** to construct the property (see `model_encoder.py` line 414: `for it in o:`). When O=0 and B=1, pyIC3 verifies an empty (trivially true) property, producing incorrect "FOUND INV" results.
+These benchmarks use **AIGER 1.1** format where safety properties are encoded in the **B (bad state) section** of the header (`aag M I L O A B`). However, pyIC3's parser only reads the **O (output) section** to construct the property (see `model_encoder.py:414`: `for it in o:`). When O=0 and B=1, pyIC3 verifies an empty (trivially true) property, producing incorrect "FOUND INV" results.
 
-### The Solution
+### The Pipeline (current)
 
-We use **yosys-abc** to convert AIGER 1.1 (with B field) into AIGER 1.0 (with O field) by folding the bad-state property into a regular output:
+We re-derive every AIGER file from the Verilog source via a deterministic two-step Yosys pipeline that produces a paired `.aag` (AIGER 1.0, B folded into O) **and** an `.map` symbol table that maps RTL signal names back to AIGER latch indices:
 
-```bash
-yosys-abc -c "&r <input>.aig; &put; fold; write_aiger <output>.aig"
+```text
+Verilog (.v / .sv) ──► yosys aigmap ──► .aig + .map ──► aigmove ──► .aag (AIGER 1.0)
 ```
 
-This command:
+- **`yosys aigmap`** does the heavy lifting (`prep`, `flatten`, `memory -nordff`, `setundef`, `techmap`, `aigmap`, `write_aiger -ascii -zinit -symbols -map …`). The `-map` flag emits the RTL→latch table needed by the LLM hint encoder. `-zinit` rewrites non-zero initial values into a standard zero-init form (this can introduce a single nameless guard latch — see "Reproducibility notes" below).
+- **`aigmove`** downgrades the AIGER 1.9 file (with B field) to AIGER 1.0 (with O field) **without** touching variable indices, so the post-conversion `.aag` and the pre-conversion `.map` remain index-consistent. This step replaces the older `yosys-abc &r &put fold` recipe, which interleaved ABC optimization passes (`balance/rewrite/refactor`) and was non-deterministic.
 
-1. `&r` — reads the AIGER file into ABC's new AIG format (supports AIGER 1.1 with B/C fields)
-2. `&put` — transfers the AIG to ABC's old network format
-3. `fold` — folds bad-state (B) and constraint (C) properties into the combinational logic, converting them to regular outputs (O)
-4. `write_aiger` — writes the result as AIGER 1.0 with O=1
+The full conversion script lives in `experiment/convert_all.sh`.
 
-After conversion, the header changes from `aag M I L 0 A 1` to `aag M I L 1 A`, and pyIC3 can correctly parse and verify the property.
+### Reproducibility notes
 
-### Conversion Script
-
-```bash
-#!/bin/bash
-# Convert all 12 BlockSys benchmarks from AIGER 1.1 to AIGER 1.0
-BENCHMARKS=(
-  "client_server:avr/crafted/client_server/client_server.aig"
-  "toy_lock_4:avr/crafted/toy_lock_4/toy_lock_4.aig"
-  "h_Dekker:avr/opensource/h_Dekker/h_Dekker.aig"
-  "h_Arbiter:avr/opensource/h_Arbiter/h_Arbiter.aig"
-  "h_TreeArb:avr/opensource/h_TreeArb/h_TreeArb.aig"
-  "cache_coherence_two:avr/opensource/cache_coherence_two/cache_coherence_two.aig"
-  "cache_coherence_three:avr/opensource/cache_coherence_three/cache_coherence_three.aig"
-  "sw_state_machine:avr/crafted/sw_state_machine/sw_state_machine.aig"
-  "h_Vending:avr/opensource/h_Vending/h_Vending.aig"
-  "Heap:avr/opensource/Heap/Heap.aig"
-  "h_CRC:avr/opensource/h_CRC/h_CRC.aig"
-  "h_FIFO:avr/opensource/h_FIFO/h_FIFO.aig"
-)
-
-MC_BENCH="/path/to/mc-benchmark"
-OUTPUT_DIR="./converted"
-mkdir -p "$OUTPUT_DIR"
-
-for entry in "${BENCHMARKS[@]}"; do
-  name="${entry%%:*}"
-  path="${entry##*:}"
-  echo "Converting $name..."
-  yosys-abc -c "&r ${MC_BENCH}/${path}; &put; fold; write_aiger ${OUTPUT_DIR}/${name}.aig"
-  # Convert to ASCII for pyIC3
-  aigtoaig "${OUTPUT_DIR}/${name}.aig" "${OUTPUT_DIR}/${name}.aag"
-done
-```
+- **Determinism, byte-verified.** Running the pipeline twice on the 10 newly-regenerated benchmarks yields byte-identical `.aag` and `.map` outputs (20/20 files).
+- **`v ↔ map ↔ aag` correspondence is byte-checked.** Re-running `yosys aigmap` from `experiment/blocksys_benchmarks/safety/<name>/original/<src>.v` produces the same `.map` as the one in `auxiliary/`. The `.aag` and `.map` are emitted by the same `yosys` invocation, so they are paired by construction; `aigmove` preserves indices, so the `data/<name>.aag` shipped with each benchmark is the canonical companion of `auxiliary/<name>.map`.
+- **Latch counts.** The `unique latch IDs in .map` count matches the AIGER `L` field exactly for 10/12 benchmarks. `h_Dekker` (10 vs 9) and `h_Vending` (23 vs 22) are off by one — the missing latch is the unnamed `-zinit` guard inserted by Yosys for non-zero initial state. It is not referenced by any RTL signal name and does not affect hint injection.
+- **`h_Vending` source patch.** Upstream `original/main.sv` is missing four `parameter NICKEL/DIME/QUARTER/...` declarations, which causes Yosys to fail. The repo ships a patched copy as `experiment/blocksys_benchmarks/safety/h_Vending/original/main.sv`.
+- **`Heap` and `toy_lock_4` exception.** These two `data/*.aag` files were not regenerated by the new `aigmap → aigmove` pipeline; they are the original artefacts from the legacy `yosys-abc &put; fold` pipeline (preserved because they pair with hand-tuned `auxiliary/*_hints.json` files whose RTL references have been confirmed to resolve against the shipped `.map`). Both `latch` counts match (`Heap`: 24/24; `toy_lock_4`: 100/100), and end-to-end runs with hints reproduce the published timings (`toy_lock_4` ≈ 1.8s, `Heap` ≈ 97s).
 
 ## Experimental Results
 
@@ -135,12 +105,13 @@ All benchmarks were verified using both **pyIC3** (Python IC3/PDR implementation
 
 ### LLM-Guided IC3 Results
 
-We re-converted all 12 benchmarks via a Yosys `aigmap` pipeline that preserves RTL-to-AIGER symbol mappings (see `convert_all.sh`). An LLM (Claude Sonnet 4.6) reads the original Verilog source and generates candidate invariant predicates. Each candidate is verified by a **two-tier filter** before injection:
+We re-converted all 12 benchmarks via the Yosys `aigmap → aigmove` pipeline (see `experiment/convert_all.sh`) so that every `.aag` ships with a paired RTL-to-AIGER symbol map. An LLM (Claude Sonnet 4.6) reads the original Verilog source and generates candidate invariant predicates. Each candidate is verified by a **three-tier filter** before injection:
 
-- **Tier 0**: `Init ∧ ¬hint` is UNSAT — hint holds in the initial state.
-- **Tier 2**: `hint ∧ Post ∧ T ∧ ¬hint'` is UNSAT — hint is relatively inductive with respect to the safety property.
+- **Tier 0** — *init filter*: `Init ∧ ¬hint` is UNSAT (the hint holds in the initial state). Hints that fail Tier 0 are dropped immediately.
+- **Tier 3** — *joint inductiveness*: `(∧ surviving hints) ∧ Post ∧ T ∧ ¬(∧ surviving hints)'` is UNSAT, in a single SAT call. If Tier 3 passes, the entire batch is injected together.
+- **Tier 2** — *individual fallback*: if Tier 3 fails, fall back to per-hint relative inductiveness `hint ∧ Post ∧ T ∧ ¬hint'` is UNSAT, and inject only the hints that individually pass.
 
-Hints that fail either check are discarded. Verified hints are injected as lemmas into IC3 frames before solving. See `run_llm.py --batch` to reproduce.
+Verified hints are injected as lemmas into IC3 frames before solving. See `run.py --batch` to reproduce. The verifier lives in `llm_oracle.py:verify_and_inject`.
 
 
 | #   | Benchmark             | Generated | Injected | Vanilla               | W/Hints                   | dFrames | dTime      | dSAT     |
@@ -192,7 +163,7 @@ Hints that fail either check are discarded. Verified hints are injected as lemma
 
 ## Benchmark Source Paths
 
-All benchmarks are sourced from the mc-benchmark repository.
+All benchmarks are sourced from the [mc-benchmark](https://github.com/gipsyh/mc-benchmark) repository. Working copies (with regenerated `.aag` / `.map` and patched sources where needed) live in `experiment/blocksys_benchmarks/` and are the canonical inputs for everything in this report. The absolute paths below point to the upstream snapshot used during preparation, kept for provenance.
 
 ### Safety Benchmarks (12)
 
@@ -215,16 +186,14 @@ All benchmarks are sourced from the mc-benchmark repository.
 
 ### Liveness Benchmarks (attempted, not used in final evaluation)
 
+Only the four benchmarks listed below are imported into `experiment/blocksys_benchmarks/liveness/`. The other LMCS-2006 cases (`abp4`, `dme3`, `reactor`, `production-cell`) were inspected but not converted into the working copy.
+
 
 | Benchmark       | Absolute Path                                                                   |
 | --------------- | ------------------------------------------------------------------------------- |
 | counter         | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/counter/`         |
 | mutex           | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/mutex/`           |
 | ring            | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/ring/`            |
-| abp4            | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/abp4/`            |
 | brp             | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/brp/`             |
-| dme3            | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/dme/`             |
-| reactor         | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/reactor/`         |
-| production-cell | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/production-cell/` |
 
 
