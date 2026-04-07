@@ -165,37 +165,53 @@ class PredicateEncoder:
         """var != 0 : at least one bit is true."""
         return Or([b for b, _ in self._get_bits(var_name)])
 
+    def _const_bits(self, width, value):
+        """Return [(BoolVal, bit_idx)] for an integer constant of given width."""
+        return [(BoolVal(((value >> i) & 1) == 1), i) for i in range(width)]
+
+    def _word_bits_or_const(self, x, ref_width=None):
+        """Accept str (Verilog word name) or int (constant). Return [(bool, bit)]."""
+        if isinstance(x, int):
+            assert ref_width is not None, "constant needs a width reference"
+            return self._const_bits(ref_width, x)
+        return self._get_bits(x)
+
     def word_eq(self, var_a, var_b):
-        """var_a == var_b : all corresponding bits equal."""
+        """var_a == var_b. Either side may be an int constant."""
+        if isinstance(var_a, int) and isinstance(var_b, int):
+            return BoolVal(var_a == var_b)
+        if isinstance(var_a, int):
+            var_a, var_b = var_b, var_a  # canonicalize: name first
         bits_a = self._get_bits(var_a)
-        bits_b = self._get_bits(var_b)
-        assert len(bits_a) == len(bits_b), f"Width mismatch: {var_a}({len(bits_a)}) vs {var_b}({len(bits_b)})"
+        bits_b = self._word_bits_or_const(var_b, ref_width=len(bits_a))
+        assert len(bits_a) == len(bits_b), f"Width mismatch in word_eq({var_a},{var_b})"
         return And([a == b for (a, _), (b, _) in zip(bits_a, bits_b)])
 
     def word_neq(self, var_a, var_b):
-        """var_a != var_b."""
+        """var_a != var_b. Either side may be an int constant."""
         return Not(self.word_eq(var_a, var_b))
 
     def word_lt(self, var_a, var_b):
-        """Unsigned var_a < var_b, built bit-by-bit from LSB to MSB."""
-        bits_a = self._get_bits(var_a)
-        bits_b = self._get_bits(var_b)
-        assert len(bits_a) == len(bits_b), f"Width mismatch: {var_a} vs {var_b}"
+        """Unsigned var_a < var_b. Either side may be an int constant."""
+        if isinstance(var_a, int) and isinstance(var_b, int):
+            return BoolVal(var_a < var_b)
+        # need a reference width
+        ref = var_a if isinstance(var_a, str) else var_b
+        ref_width = len(self._get_bits(ref))
+        bits_a = self._word_bits_or_const(var_a, ref_width)
+        bits_b = self._word_bits_or_const(var_b, ref_width)
         lt = BoolVal(False)
         for (a, _), (b, _) in zip(bits_a, bits_b):  # LSB to MSB
             lt = Or(And(Not(a), b), And(a == b, lt))
         return lt
 
     def word_gt(self, var_a, var_b):
-        """Unsigned var_a > var_b."""
         return self.word_lt(var_b, var_a)
 
     def word_le(self, var_a, var_b):
-        """Unsigned var_a <= var_b."""
         return Not(self.word_gt(var_a, var_b))
 
     def word_ge(self, var_a, var_b):
-        """Unsigned var_a >= var_b."""
         return Not(self.word_lt(var_a, var_b))
 
     def bit_var(self, var_name, bit_idx):
@@ -220,13 +236,40 @@ class PredicateEncoder:
         raise ValueError(f"Bit {bit_idx} of {var_name} not found")
 
     def idx_eq(self, idx_var, value):
-        """Bool: word `idx_var` == integer constant `value` (bit-level encoding)."""
-        bits = self._get_bits(idx_var)
-        clauses = []
-        for b, bit_idx in bits:
-            want = (value >> bit_idx) & 1
-            clauses.append(b if want else Not(b))
-        return And(clauses) if clauses else BoolVal(True)
+        """Bool: word `idx_var` == integer constant `value` (alias for word_eq with int)."""
+        return self.word_eq(idx_var, value)
+
+    # ── Enum / state-label support ────────────────────────────────────
+    def register_enum(self, field, labels):
+        """Install symbolic labels for the integer values of a word field.
+
+        e.g. register_enum("state", ["IDLE","PUSH1","PUSH2","POP1","POP2","POP3","TEST1","TEST2"])
+        Then `state_in("IDLE","TEST2")` resolves to Or(idx_eq(state,0), idx_eq(state,7)).
+        """
+        if not hasattr(self, '_enums'):
+            self._enums = {}
+        self._enums[field] = {name: i for i, name in enumerate(labels)}
+
+    def _resolve_label(self, field, label):
+        if isinstance(label, int):
+            return label
+        enums = getattr(self, '_enums', {})
+        if field in enums and label in enums[field]:
+            return enums[field][label]
+        raise ValueError(f"Unknown label {label!r} for field {field!r}")
+
+    def in_set(self, field, *labels):
+        """Or(idx_eq(field, v) for v in labels). Labels may be ints or registered names."""
+        vals = [self._resolve_label(field, l) for l in labels]
+        return Or([self.idx_eq(field, v) for v in vals])
+
+    def state_in(self, *labels):
+        """Shortcut: in_set('state', *labels)."""
+        return self.in_set('state', *labels)
+
+    def state_is(self, label):
+        """Shortcut: idx_eq('state', label) — label may be int or registered name."""
+        return self.idx_eq('state', self._resolve_label('state', label))
 
     def build_eval_namespace(self):
         """Build a namespace dict for eval()-ing LLM-generated Z3 code.
@@ -257,7 +300,11 @@ class PredicateEncoder:
         ns['word_le'] = self.word_le
         ns['word_ge'] = self.word_ge
 
-        ns['idx_eq'] = self.idx_eq
+        ns['idx_eq']   = self.idx_eq
+        ns['in_set']   = self.in_set
+        ns['state_in'] = self.state_in
+        ns['state_is'] = self.state_is
+        ns['when']     = Implies   # alias for readability: when(cond, fact)
 
         # Direct variable names for 1-bit vars
         for name, bits in self.smap.word_vars.items():
@@ -281,34 +328,39 @@ KEY PRINCIPLE: Each clause must be SELF-SUSTAINING. Combine the invariant predic
 the REASON it is preserved. Use Or/Implies to pack multiple conditions into one clause.
 
 BAD (too weak, won't propagate):
-  Not(And(held_0, held_1))     # bare mutex, nothing explains WHY
+  Not(And(flag_a, flag_b))      # bare mutex, nothing explains WHY
 
 GOOD (self-sustaining, will propagate):
-  Or(Not(held_0), Not(held_1), word_eq("ep_0", "ep_1"))
-  # "if both hold, epochs must be equal" — the epoch mechanism is baked in,
-  # so IC3 can prove this clause is preserved by the transition.
-
-  Implies(held_0, And(word_neq_zero("ep_0"), word_gt("ep_0", word_...")))
-  # ties held to epoch ordering — the transition guard is embedded.
+  Or(Not(flag_a), Not(flag_b), word_eq("tag_a", "tag_b"))
+  # "if both flags hold, tags must be equal" — the mechanism that maintains
+  # mutex is baked into the clause, so IC3 can preserve it across transitions.
 
 Think: for each clause, what transition could violate it? Add conditions that
 rule out that transition. The clause should contain its own "proof sketch".
 
 Output ONLY `hints = [...]`. Use these APIs (already provided — DO NOT redefine, DO NOT
-import z3, DO NOT call Bool() yourself):
-- bool_var("name")              # 1-bit var by Verilog name
-- bit_var("name", idx)          # specific bit of a multi-bit var
+import z3):
+- bool_var("name") / bit_var("name", idx)
 - word_eq_zero("name") / word_neq_zero("name")
-- word_eq("a","b") / word_neq("a","b")
-- word_lt / word_gt / word_le / word_ge   # unsigned word comparison, take ("a","b")
-- Z3 logical: And, Or, Not, Implies
+- word_eq, word_neq, word_lt, word_gt, word_le, word_ge
+    Each accepts (var_name, var_name) OR (var_name, int_constant). Examples:
+        word_le("counter", 4)       # counter <= 4 (constant)
+        word_eq("buf", 3)           # buf == 3 (constant)
+        word_le("a", "b")           # var-to-var
+- idx_eq("field", value)            # alias for word_eq with int constant
+- in_set("field", v1, v2, ...)      # Or(idx_eq(field,v1), idx_eq(field,v2), ...)
+- state_in("LABEL1","LABEL2"), state_is("LABEL")
+    Use these ONLY if the symbol summary lists enum labels for "state".
+    Otherwise use idx_eq("state", int_value) with the raw integer encoding.
+- when(cond, fact)                  # alias for Implies(cond, fact) — reads better
+- Z3 logical: And, Or, Not, Implies, BoolVal
 
 CRITICAL: All var/word helpers take **string** Verilog names, not Z3 expressions.
 1-bit vars can ALSO be referenced directly by their Verilog name as a Python identifier
-(e.g. `held_0`). Do NOT use Verilog slice syntax like `var[2:0]`. For composite signals
-that contain dots/brackets in Verilog (e.g. `h[0]`), pass the whole string to bit_var
-like `bit_var("h[0]", 1)`. Do NOT write any `def`, `import`, or assignment statements
-outside the `hints = [...]` list."""
+(e.g. `flag_a`). Do NOT use Verilog slice syntax like `var[2:0]`. For composite signals
+whose names already contain brackets (e.g. an array element `mem[0]`), pass the whole
+string to bit_var like `bit_var("mem[0]", 1)`. Do NOT write any `def`, `import`, or
+assignment statements outside the `hints = [...]` list."""
 
 
 def build_user_prompt(verilog_source, property_desc, symbol_summary):
@@ -390,8 +442,10 @@ def _eval_hints_individually(code, ns):
     if not m:
         return []
 
-    # Split on top-level commas (not inside parentheses)
     body = m.group(1)
+    # Strip Python line comments — eval() rejects '#' inside expressions, and
+    # human-written hint files (e.g. toy_lock) interleave comments with clauses.
+    body = re.sub(r'#[^\n]*', '', body)
     elements = _split_top_level(body)
 
     valid = []
@@ -594,6 +648,12 @@ def load_hints(filepath, encoder):
     import json
     with open(filepath) as f:
         data = json.load(f)
+
+    # Install any enum labels declared in metadata.enums BEFORE building the namespace.
+    # e.g. {"enums": {"state": ["IDLE","PUSH1","PUSH2","POP1","POP2","POP3","TEST1","TEST2"]}}
+    enums = data.get("metadata", {}).get("enums", {})
+    for field, labels in enums.items():
+        encoder.register_enum(field, labels)
 
     ns = encoder.build_eval_namespace()
     code = data["code"]
