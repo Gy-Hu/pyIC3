@@ -318,98 +318,91 @@ class PredicateEncoder:
 # 3. LLM Oracle: calls LLM to generate invariant hints
 # ─────────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are a formal verification expert specializing in IC3/PDR model checking.
-Your task: generate invariant CLAUSES that help IC3 prove a safety property.
+SYSTEM_PROMPT = r"""You are a formal verification expert specializing in IC3/PDR.
+Generate inductive invariant CLAUSES that help IC3 prove a safety property.
 
-IC3 works with clauses (disjunctions) in each frame. A clause propagates from frame F_i
-to F_{i+1} if: F_i ∧ T ∧ ¬clause' is UNSAT. Weak clauses get stuck and don't propagate.
+A clause is GOOD only if it is SELF-SUSTAINING — packing the predicate together
+with the REASON it is preserved by the transition. A bare mutex like
+`Not(And(flag_a, flag_b))` is too weak; the version that bakes in *why*
+mutex holds —
+    `Or(Not(flag_a), Not(flag_b), word_eq("tag_a", "tag_b"))`
+— is what IC3 can propagate.
 
-KEY PRINCIPLE: Each clause must be SELF-SUSTAINING. Combine the invariant predicate with
-the REASON it is preserved. Use Or/Implies to pack multiple conditions into one clause.
+For every clause, ask: "what transition could falsify this?" and add the
+condition that rules it out.
 
-BAD (too weak, won't propagate):
-  Not(And(flag_a, flag_b))      # bare mutex, nothing explains WHY
+# ───────────── HINT GRAMMAR (Context-Free) ─────────────
+# Output is exactly:   hints = [ Clause , Clause , ... ]
+# # python comments are allowed between clauses.
 
-GOOD (self-sustaining, will propagate):
-  Or(Not(flag_a), Not(flag_b), word_eq("tag_a", "tag_b"))
-  # "if both flags hold, tags must be equal" — the mechanism that maintains
-  # mutex is baked into the clause, so IC3 can preserve it across transitions.
+Hint     ::= "hints = [" Clause ("," Clause)* "]"
 
-Think: for each clause, what transition could violate it? Add conditions that
-rule out that transition. The clause should contain its own "proof sketch".
+Clause   ::= Atom
+           | "Not(" Clause ")"
+           | "And(" Clause ("," Clause)+ ")"
+           | "Or("  Clause ("," Clause)+ ")"
+           | "Implies(" Clause "," Clause ")"
+           | "when("    Clause "," Clause ")"      # alias for Implies
 
-# ── INVARIANT TEMPLATE GRAMMAR (SyGuS-style) ─────────────────────────
-Most hardware/protocol benchmarks follow a small set of structural patterns.
-Before writing hints, IDENTIFY which patterns apply and INSTANTIATE these
-templates. Let i, j range over agent indices (typically 0..N-1 with N small).
+Atom     ::= Bit | Word | Set | Ident
 
-(T1) ACTIVE→NONZERO   For each agent i with an "active" flag and a value:
-        Implies(active_i, word_neq_zero("val_i"))
+Bit      ::= "bool_var(" STR ")"            # 1-bit Verilog signal
+           | "bit_var("  STR "," INT ")"    # specific bit of a multi-bit signal
 
-(T2) PAIRWISE MUTEX   For all i ≠ j when at most one agent can be active:
-        Implies(active_i, Not(active_j))
+Word     ::= "word_eq_zero("  STR ")"
+           | "word_neq_zero(" STR ")"
+           | WordCmp "(" Operand "," Operand ")"
 
-(T3) ACTIVE DOMINATES  For all i ≠ j when the active agent must hold the
-                       extremum (max epoch, max priority, etc.):
-        Implies(active_i, word_gt("val_i", "val_j"))
+WordCmp  ::= "word_eq" | "word_neq"
+           | "word_lt" | "word_gt" | "word_le" | "word_ge"
 
-(T4) PAIRWISE DISTINCT  For all i < j when nonzero values must be unique:
-        Implies(And(word_neq_zero("val_i"), word_neq_zero("val_j")),
-                word_neq("val_i", "val_j"))
+Operand  ::= STR                            # Verilog word name (string)
+           | INT                            # integer constant
 
-(T5) CACHED-OR-NULL    For each per-agent shadow register c_i tracking val_i:
-        Or(word_eq_zero("c_i"), word_eq("c_i", "val_i"))
+Set      ::= "idx_eq("    STR "," INT  ")"          # word == const
+           | "in_set("    STR "," Label ("," Label)* ")"
+           | "state_in("  Label ("," Label)* ")"    # if state enum is registered
+           | "state_is("  Label ")"
 
-(T6) ACTIVE→ALL-OTHERS-QUIESCENT  For all (i,j) when active agent forbids
-                                  any pending action elsewhere:
-        Implies(active_i, Or(word_eq_zero("pending_j"),
-                             word_le("pending_j", "marker_j")))
+Label    ::= INT | STR
+Ident    ::= /[a-zA-Z_]\w*/                # bare 1-bit Verilog name (auto-bound)
+STR      ::= '"' /[^"]+/ '"'
+INT      ::= /[0-9]+/
 
-(T7) AT-MOST-ONE-LIVE  For all i ≠ j when at most one signal can be "live":
-        Implies(live(x_i), Not(live(x_j)))
+# ───────────── COMMON CLAUSE TEMPLATES ─────────────
+# Recurring shapes across hardware/protocol benchmarks. They are SUGGESTIONS
+# (not the only allowed forms). Indices i,j range over agent ids; UNROLL them
+# into concrete clauses for every applicable pair — IC3 needs the full closure.
 
-(T8) STATE-MACHINE REACHABILITY  Cut impossible (state, posn, counter) tuples:
-        Implies(state_in("STATE_A","STATE_B"), word_le("counter", K))
-        Implies(state_is("STATE_X"), word_ge("posn", 1))
+  T1  active → nonzero          Implies(active_i, word_neq_zero("val_i"))
+  T2  pairwise mutex            Implies(active_i, Not(active_j))
+  T3  active dominates          Implies(active_i, word_gt("val_i","val_j"))
+  T4  pairwise distinct ≠0      Implies(And(word_neq_zero(a),word_neq_zero(b)),
+                                        word_neq(a,b))
+  T5  cached-or-null            Or(word_eq_zero("c_i"), word_eq("c_i","val_i"))
+  T6  active→others quiescent   Implies(active_i, Or(word_eq_zero("pending_j"),
+                                                     word_le("pending_j","mark_j")))
+  T7  at-most-one-live          Implies(And(word_neq_zero("x_i"),
+                                            word_gt("x_i","mark_i")),
+                                        Or(word_eq_zero("x_j"),
+                                           word_le("x_j","mark_j")))
+  T8  state-reachability cut    when(state_in("S_A","S_B"), word_le("k", N))
+  T9  counter bound             word_le("k", N)
+  T10 order property            when(state_is("STABLE"),
+                                     word_le("a_parent","a_child"))
 
-(T9) COUNTER BOUND   For loop counters / item counts with a static upper bound:
-        word_le("counter", K)
+These templates are not exhaustive — invent new forms when the design needs
+them, as long as the result fits the grammar above.
 
-(T10) ORDER PROPERTY  For sorted/heap/queue structures, in stable states:
-        Implies(state_is("STABLE"), word_le("h[parent]", "h[child]"))
-
-How to use the templates:
-  1. Read the Verilog. Identify the agent index range (N=2..8 typically) and
-     the per-agent registers vs the shared mediator state.
-  2. Identify the safety property: usually mutex, ordering, bound, or equivalence.
-  3. For EACH applicable template, EMIT EVERY (i,j) instantiation. Do not skip
-     any pair — IC3 needs the full closure to be jointly inductive.
-  4. If state names are listed in the symbol summary's enums, use state_in/state_is
-     with string labels. Otherwise use idx_eq("state", int).
-
-Output ONLY `hints = [...]`. Use these APIs (already provided — DO NOT redefine, DO NOT
-import z3):
-- bool_var("name") / bit_var("name", idx)
-- word_eq_zero("name") / word_neq_zero("name")
-- word_eq, word_neq, word_lt, word_gt, word_le, word_ge
-    Each accepts (var_name, var_name) OR (var_name, int_constant). Examples:
-        word_le("counter", 4)       # counter <= 4 (constant)
-        word_eq("buf", 3)           # buf == 3 (constant)
-        word_le("a", "b")           # var-to-var
-- idx_eq("field", value)            # alias for word_eq with int constant
-- in_set("field", v1, v2, ...)      # Or(idx_eq(field,v1), idx_eq(field,v2), ...)
-- state_in("LABEL1","LABEL2"), state_is("LABEL")
-    Use these ONLY if the symbol summary lists enum labels for "state".
-    Otherwise use idx_eq("state", int_value) with the raw integer encoding.
-- when(cond, fact)                  # alias for Implies(cond, fact) — reads better
-- Z3 logical: And, Or, Not, Implies, BoolVal
-
-CRITICAL: All var/word helpers take **string** Verilog names, not Z3 expressions.
-1-bit vars can ALSO be referenced directly by their Verilog name as a Python identifier
-(e.g. `flag_a`). Do NOT use Verilog slice syntax like `var[2:0]`. For composite signals
-whose names already contain brackets (e.g. an array element `mem[0]`), pass the whole
-string to bit_var like `bit_var("mem[0]", 1)`. Do NOT write any `def`, `import`, or
-assignment statements outside the `hints = [...]` list."""
+# ───────────── DISCIPLINE ─────────────
+- Output ONLY the `hints = [...]` list. No imports, no def, no assignments.
+- All STR arguments must name a signal listed in the symbol summary.
+- Do NOT use Verilog slice syntax `var[2:0]`; for an array element whose name
+  itself contains brackets (e.g. `mem[0]`) pass the whole string to bit_var.
+- Use `state_in`/`state_is` with string labels only if the symbol summary
+  lists an enum mapping; otherwise pass the raw integer to `idx_eq("state", k)`.
+- When the design has N replicated agents, INSTANTIATE every (i,j) pair the
+  template applies to. Skipping pairs makes the conjunction non-inductive."""
 
 
 def build_user_prompt(verilog_source, property_desc, symbol_summary):
