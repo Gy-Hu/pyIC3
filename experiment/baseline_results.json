@@ -1,0 +1,502 @@
+[
+  {
+    "engine": "mini_ic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_two/data/cache_coherence_two.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 1.061,
+    "frames": 7,
+    "name": "cache_coherence_two",
+    "category": "safety",
+    "wall": 1.092
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_three/data/cache_coherence_three.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 1.509,
+    "frames": 4,
+    "sat_calls": 476,
+    "name": "cache_coherence_three",
+    "category": "safety",
+    "wall": 1.55
+  },
+  {
+    "engine": "mini_ic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/client_server/data/client_server.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 0.114,
+    "frames": 5,
+    "name": "client_server",
+    "category": "safety",
+    "wall": 0.147
+  },
+  {
+    "engine": "mini_quip",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/client_server/data/client_server.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 0.352,
+    "frames": 5,
+    "count_may": 0,
+    "name": "client_server",
+    "category": "safety",
+    "wall": 0.388
+  },
+  {
+    "engine": "mini_ic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_three/data/cache_coherence_three.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 2.077,
+    "frames": 7,
+    "name": "cache_coherence_three",
+    "category": "safety",
+    "wall": 2.11
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/client_server/data/client_server.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 0.085,
+    "frames": 3,
+    "sat_calls": 51,
+    "name": "client_server",
+    "category": "safety",
+    "wall": 0.122
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_two/data/cache_coherence_two.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 1.604,
+    "frames": 8,
+    "sat_calls": 758,
+    "name": "cache_coherence_two",
+    "category": "safety",
+    "wall": 1.645
+  },
+  {
+    "engine": "mini_quip",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_two/data/cache_coherence_two.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 3.018,
+    "frames": 8,
+    "count_may": 0,
+    "name": "cache_coherence_two",
+    "category": "safety",
+    "wall": 3.054
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Arbiter/data/h_Arbiter.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 0.303,
+    "frames": 5,
+    "sat_calls": 249,
+    "name": "h_Arbiter",
+    "category": "safety",
+    "wall": 0.34
+  },
+  {
+    "engine": "mini_quip",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/cache_coherence_three/data/cache_coherence_three.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 3.141,
+    "frames": 6,
+    "count_may": 0,
+    "name": "cache_coherence_three",
+    "category": "safety",
+    "wall": 3.176
+  },
+  {
+    "engine": "mini_ic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Arbiter/data/h_Arbiter.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 1.686,
+    "frames": 14,
+    "name": "h_Arbiter",
+    "category": "safety",
+    "wall": 1.719
+  },
+  {
+    "engine": "mini_quip",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Arbiter/data/h_Arbiter.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 2.386,
+    "frames": 9,
+    "count_may": 0,
+    "name": "h_Arbiter",
+    "category": "safety",
+    "wall": 2.421
+  },
+  {
+    "engine": "mini_ic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_CRC/data/h_CRC.smt2",
+    "status": "ok",
+    "verdict": "unsafe",
+    "time": 17.381,
+    "frames": 4,
+    "name": "h_CRC",
+    "category": "safety",
+    "wall": 17.414
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Dekker/data/h_Dekker.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 0.411,
+    "frames": 8,
+    "sat_calls": 420,
+    "name": "h_Dekker",
+    "category": "safety",
+    "wall": 0.448
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_CRC/data/h_CRC.aag",
+    "status": "ok",
+    "verdict": "unsafe",
+    "time": 21.257,
+    "frames": 4,
+    "sat_calls": 8279,
+    "name": "h_CRC",
+    "category": "safety",
+    "wall": 21.298
+  },
+  {
+    "engine": "mini_ic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_FIFO/data/h_FIFO.smt2",
+    "status": "ok",
+    "verdict": "unsafe",
+    "time": 12.993,
+    "frames": 6,
+    "name": "h_FIFO",
+    "category": "safety",
+    "wall": 13.026
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_FIFO/data/h_FIFO.aag",
+    "status": "ok",
+    "verdict": "unsafe",
+    "time": 3.167,
+    "frames": 5,
+    "sat_calls": 969,
+    "name": "h_FIFO",
+    "category": "safety",
+    "wall": 3.209
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/Heap/data/Heap.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 373.607,
+    "frames": 29,
+    "sat_calls": 84600,
+    "name": "Heap",
+    "category": "safety",
+    "wall": 373.658
+  },
+  {
+    "engine": "mini_quip",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Dekker/data/h_Dekker.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 372.154,
+    "frames": 10,
+    "count_may": 0,
+    "name": "h_Dekker",
+    "category": "safety",
+    "wall": 372.195
+  },
+  {
+    "engine": "mini_ic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Dekker/data/h_Dekker.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 404.027,
+    "frames": 63,
+    "name": "h_Dekker",
+    "category": "safety",
+    "wall": 404.077
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_TreeArb/data/h_TreeArb.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 88.37,
+    "frames": 15,
+    "sat_calls": 18404,
+    "name": "h_TreeArb",
+    "category": "safety",
+    "wall": 88.428
+  },
+  {
+    "engine": "mini_quip",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Vending/data/h_Vending.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 919.053,
+    "frames": 37,
+    "count_may": 0,
+    "name": "h_Vending",
+    "category": "safety",
+    "wall": 919.107
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_Vending/data/h_Vending.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 9.886,
+    "frames": 14,
+    "sat_calls": 3245,
+    "name": "h_Vending",
+    "category": "safety",
+    "wall": 9.941
+  },
+  {
+    "engine": "mini_ic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/sw_state_machine/data/sw_state_machine.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 19.785,
+    "frames": 37,
+    "name": "sw_state_machine",
+    "category": "safety",
+    "wall": 19.829
+  },
+  {
+    "engine": "mini_quip",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/sw_state_machine/data/sw_state_machine.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 9.11,
+    "frames": 13,
+    "count_may": 0,
+    "name": "sw_state_machine",
+    "category": "safety",
+    "wall": 9.157
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/sw_state_machine/data/sw_state_machine.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 1.636,
+    "frames": 7,
+    "sat_calls": 422,
+    "name": "sw_state_machine",
+    "category": "safety",
+    "wall": 1.69
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_ic3",
+    "name": "Heap",
+    "category": "safety",
+    "wall": 1800.022
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_quip",
+    "name": "Heap",
+    "category": "safety",
+    "wall": 1800.021
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_quip",
+    "name": "h_CRC",
+    "category": "safety",
+    "wall": 1800.019
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_quip",
+    "name": "h_FIFO",
+    "category": "safety",
+    "wall": 1800.019
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_ic3",
+    "name": "h_TreeArb",
+    "category": "safety",
+    "wall": 1800.018
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/liveness/brp/data/brp.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 283.666,
+    "frames": 10,
+    "sat_calls": 7305,
+    "name": "brp",
+    "category": "liveness",
+    "wall": 283.729
+  },
+  {
+    "engine": "mini_quip",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/safety/h_TreeArb/data/h_TreeArb.smt2",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 1755.177,
+    "frames": 73,
+    "count_may": 0,
+    "name": "h_TreeArb",
+    "category": "safety",
+    "wall": 1755.23
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_ic3",
+    "name": "h_Vending",
+    "category": "safety",
+    "wall": 1800.017
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/liveness/counter/data/counter.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 19.221,
+    "frames": 16,
+    "sat_calls": 8189,
+    "name": "counter",
+    "category": "liveness",
+    "wall": 19.27
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_ic3",
+    "name": "toy_lock_4",
+    "category": "safety",
+    "wall": 1800.014
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_quip",
+    "name": "toy_lock_4",
+    "category": "safety",
+    "wall": 1800.016
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "pyic3",
+    "name": "toy_lock_4",
+    "category": "safety",
+    "wall": 1800.016
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_ic3",
+    "name": "brp",
+    "category": "liveness",
+    "wall": 1800.014
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/liveness/mutex/data/mutex.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 17.366,
+    "frames": 12,
+    "sat_calls": 6589,
+    "name": "mutex",
+    "category": "liveness",
+    "wall": 17.418
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_quip",
+    "name": "brp",
+    "category": "liveness",
+    "wall": 1800.016
+  },
+  {
+    "engine": "pyic3",
+    "file": "/Users/huguangyu/coding_env/pyIC3/experiment/blocksys_benchmarks/liveness/ring/data/ring.aag",
+    "status": "ok",
+    "verdict": "safe",
+    "time": 198.628,
+    "frames": 11,
+    "sat_calls": 50893,
+    "name": "ring",
+    "category": "liveness",
+    "wall": 198.68
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_ic3",
+    "name": "counter",
+    "category": "liveness",
+    "wall": 1800.014
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_quip",
+    "name": "counter",
+    "category": "liveness",
+    "wall": 1800.014
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_ic3",
+    "name": "mutex",
+    "category": "liveness",
+    "wall": 1800.014
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_quip",
+    "name": "mutex",
+    "category": "liveness",
+    "wall": 1800.014
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_ic3",
+    "name": "ring",
+    "category": "liveness",
+    "wall": 1800.014
+  },
+  {
+    "status": "timeout",
+    "time": 1800,
+    "engine": "mini_quip",
+    "name": "ring",
+    "category": "liveness",
+    "wall": 1800.014
+  }
+]

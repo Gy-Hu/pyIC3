@@ -1,200 +1,149 @@
-# BlockSys Benchmark Evaluation
+# BlockSys Benchmark Evaluation — Baseline Sweep
 
-This document reports the benchmark evaluation of pyIC3 on 12 safety-property benchmarks selected for the [BlockSys 2026](https://blocksys.info/2026/) (International Conference on Blockchain, Artificial Intelligence, and Trustworthy Systems) research project. Working copies of every benchmark live under `experiment/blocksys_benchmarks/safety/<name>/{original,data,auxiliary}/`.
+This report records a fresh run of three IC3-style baselines on the 16 BlockSys benchmarks
+(12 safety + 4 liveness, the latter pre-converted via liveness-to-safety to AIGER 1.0).
+The LLM-guided variant of pyIC3 is **not** included in this report — it will be added in a
+follow-up after this baseline is finalised.
 
-## Benchmark Selection
+## Setup
 
-We selected 12 single-property, pure-safety AIGER benchmarks from the [mc-benchmark](https://github.com/gipsyh/mc-benchmark) repository. Each benchmark is mapped to a relevant BlockSys theme (blockchain, trustworthy systems, or AI hardware).
+- **Benchmarks** — 16 cases under `experiment/blocksys_benchmarks/{safety,liveness}/<name>/`.
+  Each case ships:
+  - `data/<name>.smt2` — Horn-clause encoding consumed by `mini_ic3` / `mini_quip`
+  - `data/<name>.aag`  — AIGER 1.0 consumed by `pyIC3` (and also by `rIC3` for cross-checking).
+    Liveness benchmarks are L2S-converted into safety in this file.
+  - `original/<name>.{v,sv,aig}` — upstream sources (raw AIGER 1.9 for liveness — **not** used).
+- **Engines**
+  1. `mini_ic3`  — `experiment/baseline/mini_ic3.py`,  Z3 demo IC3, eats `.smt2`
+  2. `mini_quip` — `experiment/baseline/mini_quip.py`, Z3 demo Quip variant, eats `.smt2`
+  3. `pyIC3`    — `pdr.py` via `experiment/baseline_runner.py`, vanilla (no LLM), eats `.aag`
+- **Driver** — `experiment/run_baselines.py` (8-way `ProcessPoolExecutor`, 1800 s wall timeout
+  per (engine, benchmark) job, results streamed to `experiment/baseline_results.json`).
+- **Cross-validation** — `experiment/run_ric3.py` runs `rIC3 -e ic3` on the same `data/*.aag`
+  files, results in `experiment/ric3_results.json`. rIC3 (Rust, HWMCC'24/'25 champion) is the
+  ground-truth oracle.
+- **Environment** — `venv/bin/python` (CPython 3.14, Z3 + numpy installed). All runs share
+  one Darwin-arm64 host. The baseline sweep took **5403 s** (≈ 90 min) wall-clock for all
+  48 jobs at 8-way concurrency.
 
+### Stat collection caveat
 
-| #   | Benchmark             | Source         | BlockSys Relevance                                                                                                                                                                            |
-| --- | --------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | client_server         | avr/crafted    | **Node communication protocol** — Models client-server interaction, analogous to blockchain node P2P communication and message passing between validators.                                    |
-| 2   | toy_lock_4            | avr/crafted    | **Smart contract lock mechanism** — Verifies a lock primitive, directly mapping to reentrancy guards and mutex locks in smart contracts.                                                      |
-| 3   | h_Dekker              | avr/opensource | **Mutual exclusion → Consensus** — Dekker's algorithm ensures mutual exclusion between processes, analogous to blockchain consensus where only one node produces a block at a time.           |
-| 4   | h_Arbiter             | avr/opensource | **Bus arbiter → Block producer arbitration** — Hardware arbitration circuit that decides which agent gets access, mapping to block producer selection in blockchain systems.                  |
-| 5   | h_TreeArb             | avr/opensource | **Tree arbiter → Hierarchical/sharded consensus** — Hierarchical arbitration tree, analogous to sharded blockchain consensus or layer-2 rollup arbitration.                                   |
-| 6   | cache_coherence_two   | avr/opensource | **Two-node state consistency** — Cache coherence protocol between two nodes, directly modeling blockchain state synchronization between peers.                                                |
-| 7   | cache_coherence_three | avr/opensource | **Multi-node state consistency** — Three-node cache coherence, modeling consensus among multiple blockchain validators maintaining consistent global state.                                   |
-| 8   | sw_state_machine      | avr/crafted    | **Smart contract state machine** — Finite state machine verification, directly relevant since smart contracts are fundamentally state machines with guarded transitions.                      |
-| 9   | h_Vending             | avr/opensource | **Transaction logic state machine** — Vending machine state machine with token-based transitions, analogous to smart contract transaction processing workflows.                               |
-| 10  | Heap                  | avr/opensource | **Memory safety → Trustworthy systems** — Heap data structure verification, fundamental to memory safety guarantees in trusted execution environments.                                        |
-| 11  | h_CRC                 | avr/opensource | **Data integrity / Hash verification** — CRC (Cyclic Redundancy Check) circuit verification, directly mapping to blockchain's core requirement of data integrity and hash-based verification. |
-| 12  | h_FIFO                | avr/opensource | **Transaction queue / Message buffer** — FIFO queue verification, analogous to blockchain transaction pools (mempool) and ordered message delivery in consensus protocols.                    |
+Per the user's request, we collect everything the engines already track without modifying
+their source. Concretely:
 
+| metric    | mini_ic3 | mini_quip | pyIC3 |
+|-----------|:--------:|:---------:|:-----:|
+| verdict   | ✓        | ✓         | ✓     |
+| wall time | ✓        | ✓         | ✓     |
+| frames    | ✓ `len(states)` | ✓ `len(states)` | ✓ `len(frames)` |
+| SAT calls | —        | —         | ✓ `sum_of_sat_call` |
 
-## Benchmark Specifications
+The two demo engines do not maintain a SAT-call counter; only pyIC3 reports it.
 
-All benchmarks are single-property (B=1), pure-safety AIGER files (no justice/fairness).
+## Results
 
+`safe` = invariant found; `unsafe` = counter-example trace; `T/O` = wall timeout 1800 s.
+Frames (`F`) and SAT calls reported when available.
 
-| #   | Benchmark             | AIGER Header               | Inputs | Latches | ANDs | Property |
-| --- | --------------------- | -------------------------- | ------ | ------- | ---- | -------- |
-| 1   | client_server         | `aag 84 23 5 0 56 1`       | 23     | 5       | 56   | safe     |
-| 2   | toy_lock_4            | `aag 1624 24 100 0 1500 1` | 24     | 100     | 1500 | safe     |
-| 3   | h_Dekker              | `aag 518 92 9 0 417 1`     | 92     | 9       | 417  | safe     |
-| 4   | h_Arbiter             | `aag 366 66 23 0 277 1`    | 66     | 23      | 277  | safe     |
-| 5   | h_TreeArb             | `aag 1478 267 37 0 1174 1` | 267    | 37      | 1174 | safe     |
-| 6   | cache_coherence_two   | `aag 496 7 43 0 446 1`     | 7      | 43      | 446  | safe     |
-| 7   | cache_coherence_three | `aag 741 10 62 0 669 1`    | 10     | 62      | 669  | safe     |
-| 8   | sw_state_machine      | `aag 474 2 43 0 429 1`     | 2      | 43      | 429  | safe     |
-| 9   | h_Vending             | `aag 1443 245 22 0 1176 1` | 245    | 22      | 1176 | safe     |
-| 10  | Heap                  | `aag 1640 249 24 0 1367 1` | 249    | 24      | 1367 | safe     |
-| 11  | h_CRC                 | `aag 666 13 32 0 621 1`    | 13     | 32      | 621  | unsafe   |
-| 12  | h_FIFO                | `aag 645 85 54 0 506 1`    | 85     | 54      | 506  | unsafe   |
+| #  | Benchmark             | mini_ic3                       | mini_quip                       | pyIC3                                | rIC3 (oracle)        |
+|---:|-----------------------|--------------------------------|----------------------------------|--------------------------------------|----------------------|
+| 1  | client_server         | safe / 0.114 s / F=5           | safe / 0.352 s / F=5             | safe / 0.085 s / F=3 / SAT=51        | safe / 0.090 s       |
+| 2  | toy_lock_4            | **T/O**                        | **T/O**                          | **T/O**                              | safe / 270.920 s     |
 
+| 3  | h_Dekker              | safe / 404.027 s / F=63        | safe / 372.154 s / F=10          | safe / 0.411 s / F=8 / SAT=420       | safe / 0.097 s       |
+| 4  | h_Arbiter             | safe / 1.686 s / F=14          | safe / 2.386 s / F=9             | safe / 0.303 s / F=5 / SAT=249       | safe / 0.097 s       |
+| 5  | h_TreeArb             | **T/O**                        | safe / 1755.177 s / F=73         | safe / 88.370 s / F=15 / SAT=18404   | safe / 0.114 s       |
+| 6  | cache_coherence_two   | safe / 1.061 s / F=7           | safe / 3.018 s / F=8             | safe / 1.604 s / F=8 / SAT=758       | safe / 0.094 s       |
+| 7  | cache_coherence_three | safe / 2.077 s / F=7           | safe / 3.141 s / F=6             | safe / 1.509 s / F=4 / SAT=476       | safe / 0.103 s       |
+| 8  | sw_state_machine      | safe / 19.785 s / F=37         | safe / 9.110 s / F=13            | safe / 1.636 s / F=7 / SAT=422       | safe / 0.092 s       |
+| 9  | h_Vending             | **T/O**                        | safe / 919.053 s / F=37          | safe / 9.886 s / F=14 / SAT=3245     | safe / 0.109 s       |
+| 10 | Heap                  | **T/O**                        | **T/O**                          | safe / 373.607 s / F=29 / SAT=84600  | safe / 0.252 s       |
+| 11 | h_CRC                 | unsafe / 17.381 s / F=4        | **T/O**                          | unsafe / 21.257 s / F=4 / SAT=8279   | unsafe / 0.108 s     |
+| 12 | h_FIFO                | unsafe / 12.993 s / F=6        | **T/O**                          | unsafe / 3.167 s / F=5 / SAT=969     | unsafe / 0.117 s     |
+| 13 | counter (L2S)         | **T/O**                        | **T/O**                          | safe / 19.221 s / F=16 / SAT=8189    | safe / 0.118 s       |
+| 14 | mutex (L2S)           | **T/O**                        | **T/O**                          | safe / 17.366 s / F=12 / SAT=6589    | safe / 0.108 s       |
+| 15 | ring (L2S)            | **T/O**                        | **T/O**                          | safe / 198.628 s / F=11 / SAT=50893  | safe / 0.119 s       |
+| 16 | brp (L2S)             | **T/O**                        | **T/O**                          | safe / 283.666 s / F=10 / SAT=7305   | safe / 0.184 s       |
 
-## AIGER Format Conversion
+## Aggregate
 
-### The Problem
+| Engine    | Solved | Timeouts | Errors | Mean time on solved (s) | Median time on solved (s) |
+|-----------|-------:|---------:|-------:|------------------------:|--------------------------:|
+| mini_ic3  | 9 / 16 | 7        | 0      | 51.13                   | 12.99                     |
+| mini_quip | 8 / 16 | 8        | 0      | 383.05                  | 6.13                      |
+| pyIC3     | 15 / 16| 1        | 0      | 66.27                   | 13.63                     |
+| rIC3      | 16 / 16| 0        | 0      | 17.62                   | 0.110                     |
 
-These benchmarks use **AIGER 1.1** format where safety properties are encoded in the **B (bad state) section** of the header (`aag M I L O A B`). However, pyIC3's parser only reads the **O (output) section** to construct the property (see `model_encoder.py:414`: `for it in o:`). When O=0 and B=1, pyIC3 verifies an empty (trivially true) property, producing incorrect "FOUND INV" results.
+(Means exclude timeouts. Only rIC3 solves every case; pyIC3 misses just `toy_lock_4`.)
 
-### The Pipeline (current)
+## Cross-validation against rIC3
 
-We re-derive every AIGER file from the Verilog source via a deterministic two-step Yosys pipeline that produces a paired `.aag` (AIGER 1.0, B folded into O) **and** an `.map` symbol table that maps RTL signal names back to AIGER latch indices:
+For every (engine, benchmark) pair where the engine **terminated**, the verdict (`safe` /
+`unsafe`) agrees with rIC3:
 
-```text
-Verilog (.v / .sv) ──► yosys aigmap ──► .aig + .map ──► aigmove ──► .aag (AIGER 1.0)
+- mini_ic3:  9/9 consistent (7 timeouts excluded)
+- mini_quip: 8/8 consistent (8 timeouts excluded)
+- pyIC3:    15/15 consistent (1 timeout on `toy_lock_4` excluded)
+
+No disagreements were observed. rIC3 itself solves 16/16 in <5 minutes total (toy_lock_4
+dominates at 270.9 s; the other 15 finish in well under 1 s each).
+
+Notes on the rIC3 setup:
+- Initially `run_ric3.py` was reading `original/<name>.aig` (raw AIGER 1.9), which made
+  rIC3 return `unknown` on the four liveness benchmarks because their property is encoded
+  as `J` (justice), not as a bad-state output. The script was patched to prefer
+  `data/<name>.aag` (the L2S-converted file shipped with the benchmark), after which all
+  16 cases produce a definitive `safe` / `unsafe` verdict.
+- The other three engines were already consuming the `data/` artefacts, so no analogous
+  fix was needed for them.
+
+## Per-case observations
+
+- **toy_lock_4** — only rIC3 solves it (270.9 s); all three Python engines (mini_ic3,
+  mini_quip, **and pyIC3**) time out at 1800 s. This is the hardest case in the suite
+  for IC3-style search and the sole pyIC3 timeout.
+- **Heap** — pyIC3 solves it in 373.6 s with 84.6 k SAT calls (29 frames); both `mini_*`
+  time out. Z3 SAT-call volume here dominates everything else in the suite.
+- **h_TreeArb** — `mini_ic3` times out, `mini_quip` solves it in 1755 s (73 frames), pyIC3
+  solves it in 88 s (15 frames, 18 k SAT calls); rIC3 in 0.11 s.
+- **h_Dekker** — interesting frame-count gap: `mini_ic3` reports 63 frames vs
+  `mini_quip`'s 10 and pyIC3's 8. mini_ic3 lacks Quip's reachability tracking and pyIC3's
+  generalisation, so it climbs much higher in frame depth before convergence.
+- **h_CRC / h_FIFO** — the only two `unsafe` cases. mini_ic3 finds the trace in
+  17.4 / 13.0 s; pyIC3 in 21.3 / 3.2 s; mini_quip times out on both (the Quip
+  reachability bookkeeping seems to hurt rather than help on these short counter-examples).
+- **liveness/L2S** — all four liveness-derived benchmarks (`counter`, `mutex`, `ring`,
+  `brp`) are out of reach for both demo engines (they all hit T/O even though the
+  underlying problems are small) but pyIC3 closes them in 17 – 284 s.
+
+## Reproducing
+
+```bash
+# Baseline sweep — 3 engines × 16 cases, 8-way parallel, 1800 s timeout
+venv/bin/python experiment/run_baselines.py
+# -> experiment/baseline_results.json
+# -> experiment/baseline_run.log
+
+# rIC3 cross-check
+venv/bin/python experiment/run_ric3.py
+# -> experiment/ric3_results.json
 ```
 
-- **`yosys aigmap`** does the heavy lifting (`prep`, `flatten`, `memory -nordff`, `setundef`, `techmap`, `aigmap`, `write_aiger -ascii -zinit -symbols -map …`). The `-map` flag emits the RTL→latch table needed by the LLM hint encoder. `-zinit` rewrites non-zero initial values into a standard zero-init form (this can introduce a single nameless guard latch — see "Reproducibility notes" below).
-- **`aigmove`** downgrades the AIGER 1.9 file (with B field) to AIGER 1.0 (with O field) **without** touching variable indices, so the post-conversion `.aag` and the pre-conversion `.map` remain index-consistent. This step replaces the older `yosys-abc &r &put fold` recipe, which interleaved ABC optimization passes (`balance/rewrite/refactor`) and was non-deterministic.
+Per-job entry point used by the orchestrator:
 
-The full conversion script lives in `experiment/convert_all.sh`.
+```bash
+venv/bin/python experiment/baseline_runner.py {mini_ic3|mini_quip|pyic3} <file>
+```
 
-### Reproducibility notes
+Each call prints one JSON line with `verdict`, `time`, `frames`, and (for pyIC3) `sat_calls`.
 
-- **Determinism, byte-verified.** Running the pipeline twice on the 10 newly-regenerated benchmarks yields byte-identical `.aag` and `.map` outputs (20/20 files).
-- **`v ↔ map ↔ aag` correspondence is byte-checked.** Re-running `yosys aigmap` from `experiment/blocksys_benchmarks/safety/<name>/original/<src>.v` produces the same `.map` as the one in `auxiliary/`. The `.aag` and `.map` are emitted by the same `yosys` invocation, so they are paired by construction; `aigmove` preserves indices, so the `data/<name>.aag` shipped with each benchmark is the canonical companion of `auxiliary/<name>.map`.
-- **Latch counts.** The `unique latch IDs in .map` count matches the AIGER `L` field exactly for 10/12 benchmarks. `h_Dekker` (10 vs 9) and `h_Vending` (23 vs 22) are off by one — the missing latch is the unnamed `-zinit` guard inserted by Yosys for non-zero initial state. It is not referenced by any RTL signal name and does not affect hint injection.
-- **`h_Vending` source patch.** Upstream `original/main.sv` is missing four `parameter NICKEL/DIME/QUARTER/...` declarations, which causes Yosys to fail. The repo ships a patched copy as `experiment/blocksys_benchmarks/safety/h_Vending/original/main.sv`.
-- **`Heap` and `toy_lock_4` exception.** These two `data/*.aag` files were not regenerated by the new `aigmap → aigmove` pipeline; they are the original artefacts from the legacy `yosys-abc &put; fold` pipeline (preserved because they pair with hand-tuned `auxiliary/*_hints.json` files whose RTL references have been confirmed to resolve against the shipped `.map`). Both `latch` counts match (`Heap`: 24/24; `toy_lock_4`: 100/100), and end-to-end runs with hints reproduce the published timings (`toy_lock_4` ≈ 1.8s, `Heap` ≈ 97s).
+## Files
 
-## Experimental Results
-
-### pyIC3 vs rIC3 Comparison
-
-All benchmarks were verified using both **pyIC3** (Python IC3/PDR implementation) and **rIC3** (Rust IC3 implementation, HWMCC'24 & HWMCC'25 champion).
-
-
-| #   | Benchmark             | pyIC3 Result         | pyIC3 Time | rIC3 Result  | rIC3 Time | Consistent |
-| --- | --------------------- | -------------------- | ---------- | ------------ | --------- | ---------- |
-| 1   | client_server         | FOUND INV (safe)     | 0.058s     | UNSAT (safe) | 0.00s     | Yes        |
-| 2   | toy_lock_4            | TIMEOUT              | >300s      | UNSAT (safe) | 199.44s   | -          |
-| 3   | h_Dekker              | FOUND INV (safe)     | 0.946s     | UNSAT (safe) | 0.01s     | Yes        |
-| 4   | h_Arbiter             | FOUND INV (safe)     | 0.457s     | UNSAT (safe) | 0.00s     | Yes        |
-| 5   | h_TreeArb             | FOUND INV (safe)     | 108.364s   | UNSAT (safe) | 0.03s     | Yes        |
-| 6   | cache_coherence_two   | FOUND INV (safe)     | 1.353s     | UNSAT (safe) | 0.00s     | Yes        |
-| 7   | cache_coherence_three | FOUND INV (safe)     | 2.493s     | UNSAT (safe) | 0.01s     | Yes        |
-| 8   | sw_state_machine      | FOUND INV (safe)     | 2.234s     | UNSAT (safe) | 0.00s     | Yes        |
-| 9   | h_Vending             | FOUND INV (safe)     | 23.682s    | UNSAT (safe) | 0.03s     | Yes        |
-| 10  | Heap                  | TIMEOUT              | >300s      | UNSAT (safe) | 0.20s     | -          |
-| 11  | h_CRC                 | FOUND TRACE (unsafe) | 2.374s     | SAT (unsafe) | 0.02s     | Yes        |
-| 12  | h_FIFO                | FOUND TRACE (unsafe) | 8.577s     | SAT (unsafe) | 0.03s     | Yes        |
-
-
-### Summary
-
-- **Consistent results**: 10 out of 12 benchmarks (where pyIC3 terminated)
-- **pyIC3 timeouts**: 2 benchmarks (toy_lock_4, Heap) — rIC3 solved both
-- **Safe benchmarks**: 10 (properties hold — the bad state is unreachable)
-- **Unsafe benchmarks**: 2 (h_CRC, h_FIFO — counterexample traces found)
-- **pyIC3 time range**: 0.058s to 108.364s (3 orders of magnitude)
-- **rIC3 time range**: 0.00s to 199.44s (toy_lock_4 is the only slow case)
-
-### LLM-Guided IC3 Results
-
-We re-converted all 12 benchmarks via the Yosys `aigmap → aigmove` pipeline (see `experiment/convert_all.sh`) so that every `.aag` ships with a paired RTL-to-AIGER symbol map. An LLM (Claude Sonnet 4.6) reads the original Verilog source and generates candidate invariant clauses. Each candidate is sanity-checked following the **clause-sideloading** discipline of LeGend (Miao, Hu, Zhang, Zhang, 2026; [arxiv:2602.24010](https://arxiv.org/abs/2602.24010), Algorithm 3 and §3.3.2):
-
-- **Initiation**: `I ∧ ¬C` is UNSAT — the clause holds in the initial state.
-- **1st-step consistency**: `I ∧ T ∧ ¬C'` is UNSAT — the clause holds after one transition from the initial state.
-
-A clause that passes both checks satisfies `C ⊇ Reach(≤1)` and is soundly added as a lemma to frame `F_1`. No relative-inductiveness check is performed; IC3's own `PropagateLemmas` pass either pushes the clause forward or quietly leaves it behind, which is harmless. See `run.py --batch` to reproduce. The sideloader lives in `clause_sideloader.py:sideload_clauses`.
-
-> **Note on the experimental tables below.** The numbers were measured against an earlier implementation of the hint verifier that used a three-tier filter (*Initiation → joint relative inductiveness → per-hint relative inductiveness fallback*). That filter has been replaced with the two-check LeGend sideloader described above; the per-benchmark trends (hints helping or hurting, frames/SAT deltas) are still representative, but individual numbers may differ slightly on a rerun. The timeout-case analysis and the Tier 2/3 discussion in *Open problems* similarly reflect the legacy filter and are kept as a record of what motivated the switch to LeGend-style sideloading.
-
-
-| #   | Benchmark             | Generated | Injected | Vanilla               | W/Hints                   | dFrames | dTime      | dSAT     |
-| --- | --------------------- | --------- | -------- | --------------------- | ------------------------- | ------- | ---------- | -------- |
-| 1   | client_server         | 15        | 15       | 0.044s / 3F / 51sat   | 0.024s / 3F / 37sat       | 0       | **-45%**   | -27%     |
-| 2   | toy_lock_4            | 28        | **0**    | T/O / 4F / 15315sat   | T/O / 4F / 14676sat       | 0       | -          | -4%      |
-| 3   | h_Dekker              | 8         | 8        | 0.86s / 8F / 455sat   | 0.48s / 7F / 346sat       | **-1**  | **-44%**   | -24%     |
-| 4   | h_Arbiter             | 0         | 0        | 0.10s / 3F / 85sat    | 0.10s / 3F / 85sat        | 0       | 0          | 0        |
-| 5   | **h_TreeArb**         | 19        | **9**    | 124s / 15F / 18571sat | **34.5s / 10F / 7210sat** | **-5**  | **-72%**   | **-61%** |
-| 6   | cache_coherence_two   | 0         | 0        | 0.66s / 4F / 264sat   | 0.62s / 4F / 233sat       | 0       | -7%        | -12%     |
-| 7   | cache_coherence_three | 12        | 12       | 2.02s / 6F / 578sat   | 1.93s / 4F / 531sat       | **-2**  | -5%        | -8%      |
-| 8   | sw_state_machine      | 11        | **7**    | 0.53s / 5F / 149sat   | 0.55s / 5F / 192sat       | 0       | +4%        | +29%     |
-| 9   | h_Vending             | 10        | 10       | 16.1s / 15F / 4029sat | 12.2s / 13F / 2935sat     | **-2**  | **-24%**   | -27%     |
-| 10  | Heap                  | 13        | **5**    | T/O / 18F / 30699sat  | T/O / 17F / 32865sat      | **-1**  | -          | +7%      |
-| 11  | **h_CRC**             | 3         | 3        | 38.5s / 4F / 10247sat | **0.95s / 4F / 287sat**   | 0       | **-97.5%** | **-97%** |
-| 12  | h_FIFO                | 21        | 21       | 6.33s / 5F / 1413sat  | 4.96s / 5F / 1215sat      | 0       | **-22%**   | -14%     |
-
-
- LLM hint encoding failed (hierarchical variable names not in AIGER map), equivalent to 0 hints.
-
-**Key findings**:
-
-- **9/10 benchmarks with hints improved or held steady** (no degradation). The Tier 2 relative-inductiveness filter eliminated all regressions from incorrect hints.
-- **5 benchmarks with frame reduction**: h_TreeArb (15->10), h_Dekker (8->7), cache_coherence_three (6->4), h_Vending (15->13), Heap (18->17).
-- **Best speedup: h_CRC 40x** (38.5s -> 0.95s). This is an unsafe case — LLM hints prune the counterexample search space, reducing SAT calls from 10247 to 287.
-- **Tier 2 filter impact**: On h_TreeArb, 10/19 LLM-generated hints were rejected as non-relatively-inductive. Without the filter, these bad hints caused a +27% slowdown; with the filter, the same benchmark achieved a **72% speedup and 5 fewer frames**. On sw_state_machine, 4/11 hints were rejected, turning a +97% slowdown into a neutral result (+4%).
-
-**Timeout case analysis** (120s cutoff, Tier 3 → Tier 2 fallback, detailed profiling):
-
-| Metric | toy_lock_4 Vanilla | toy_lock_4 W/Hints | Heap Vanilla | Heap W/Hints |
-|---|---|---|---|---|
-| Frames reached | 4 | 4 | 17 | **16 (-1)** |
-| Hints generated / injected | - | 32 / **11** | - | 9 / **4** |
-| Lemmas in F1 | 285 | 282 | 355 | 371 (+16) |
-| **Lemmas in deepest F** | **9** | **19 (+10)** | 37 | 38 |
-| SAT calls | 14413 | 14057 (**-2.5%**) | 28915 | 30525 (+5.6%) |
-| Push success rate | 72/10060 (0.7%) | **94/8406 (1.1%)** | 906/11782 (7.7%) | 879/12229 (7.2%) |
-| Propagate time | 70.7s (59%) | **64.5s (54%)** | 60.0s (50%) | 59.1s (49%) |
-| MIC time | 22.3s (19%) | 29.0s (24%) | 41.1s (34%) | 42.4s (35%) |
-
-- **toy_lock_4**: Tier 3 failed (joint conjunction not inductive due to 1 bad hint + some non-inductive ones mixed in), Tier 2 fallback kept 11/32 hints. Frame count unchanged (both stuck at 4), but the deepest frame accumulated **more lemmas** (9→19) — hints helped IC3 discover more valid blocking clauses within the current frame. Push success rate improved 57% (0.7%→1.1%), and propagate time dropped 8.8%. The 6 mutual-exclusion predicates were rejected by Tier 2 (not individually inductive); these would require a cleaner Tier 3 pass (filtering the 1 init-violating hint first, then re-checking the rest as a group).
-- **Heap**: 4/9 hints injected, frame reached 16 vs 17 (**-1 frame**). SAT calls increased 5.6% due to extra lemmas adding propagation overhead. Heap likely needs 20+ frames to converge; at the current rate, ~30 more seconds would suffice with hints (vs ~40 without).
-
-**Open problems**:
-
-1. **Tier 3 joint-inductiveness is implemented but fragile**: The current strategy tries Tier 3 (all hints as a conjunction) first, then falls back to Tier 2 (individual). On toy_lock_4, Tier 3 fails because the batch includes 1 init-violating hint and several non-inductive ones — the conjunction is polluted. A more robust approach would: (a) filter init-violating hints first, (b) then try Tier 3 on the clean subset, (c) if still fails, iteratively remove hints to find the maximal jointly-inductive subset.
-2. **Z3 per-call overhead on large circuits**: toy_lock_4 (100 latches, 1046 ANDs) and Heap (24 latches, 654 ANDs) remain fundamentally limited by Z3's performance on propositional SAT. Replacing Z3 with a dedicated CDCL solver (Kissat/CaDiCaL) would likely resolve both timeouts.
-3. **Variable name resolution**: LLM-generated references sometimes use hierarchical names (`pcacheA.state`), Verilog macros (`K2`), or double-indexed patterns (`pc[0][2:0]`). Fallback parsing and per-hint error recovery handle most cases, but 2/12 benchmarks (h_Arbiter, cache_coherence_two) still produce 0 valid hints.
-
-## Benchmark Source Paths
-
-All benchmarks are sourced from the [mc-benchmark](https://github.com/gipsyh/mc-benchmark) repository. Working copies (with regenerated `.aag` / `.map` and patched sources where needed) live in `experiment/blocksys_benchmarks/` and are the canonical inputs for everything in this report. The absolute paths below point to the upstream snapshot used during preparation, kept for provenance.
-
-### Safety Benchmarks (12)
-
-
-| Benchmark             | Absolute Path                                                                    |
-| --------------------- | -------------------------------------------------------------------------------- |
-| client_server         | `/Users/huguangyu/coding_env/mc-benchmark/avr/crafted/client_server/`            |
-| toy_lock_4            | `/Users/huguangyu/coding_env/mc-benchmark/avr/crafted/toy_lock_4/`               |
-| h_Dekker              | `/Users/huguangyu/coding_env/mc-benchmark/avr/opensource/h_Dekker/`              |
-| h_Arbiter             | `/Users/huguangyu/coding_env/mc-benchmark/avr/opensource/h_Arbiter/`             |
-| h_TreeArb             | `/Users/huguangyu/coding_env/mc-benchmark/avr/opensource/h_TreeArb/`             |
-| cache_coherence_two   | `/Users/huguangyu/coding_env/mc-benchmark/avr/opensource/cache_coherence_two/`   |
-| cache_coherence_three | `/Users/huguangyu/coding_env/mc-benchmark/avr/opensource/cache_coherence_three/` |
-| sw_state_machine      | `/Users/huguangyu/coding_env/mc-benchmark/avr/crafted/sw_state_machine/`         |
-| h_Vending             | `/Users/huguangyu/coding_env/mc-benchmark/avr/opensource/h_Vending/`             |
-| Heap                  | `/Users/huguangyu/coding_env/mc-benchmark/avr/opensource/Heap/`                  |
-| h_CRC                 | `/Users/huguangyu/coding_env/mc-benchmark/avr/opensource/h_CRC/`                 |
-| h_FIFO                | `/Users/huguangyu/coding_env/mc-benchmark/avr/opensource/h_FIFO/`                |
-
-
-### Liveness Benchmarks (attempted, not used in final evaluation)
-
-Only the four benchmarks listed below are imported into `experiment/blocksys_benchmarks/liveness/`. The other LMCS-2006 cases (`abp4`, `dme3`, `reactor`, `production-cell`) were inspected but not converted into the working copy.
-
-
-| Benchmark       | Absolute Path                                                                   |
-| --------------- | ------------------------------------------------------------------------------- |
-| counter         | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/counter/`         |
-| mutex           | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/mutex/`           |
-| ring            | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/ring/`            |
-| brp             | `/Users/huguangyu/coding_env/mc-benchmark/LMCS-2006/aiger-1.9/brp/`             |
-
-
+- `experiment/baseline_runner.py`  — single-job runner (importable engines, captures stdout
+  to detect `FOUND INV` / `FOUND TRACE`)
+- `experiment/run_baselines.py`    — parallel orchestrator (3 × 16 = 48 jobs)
+- `experiment/run_ric3.py`         — rIC3 cross-validation driver
+- `experiment/baseline_results.json` — full baseline data dump
+- `experiment/ric3_results.json`     — rIC3 oracle data dump
+- `experiment/baseline_run.log`      — streaming log of the sweep
+- `experiment/ric3_run.log`          — streaming log of the rIC3 run
