@@ -219,6 +219,15 @@ class PredicateEncoder:
                 return Not(z3_var) if is_inv else z3_var
         raise ValueError(f"Bit {bit_idx} of {var_name} not found")
 
+    def idx_eq(self, idx_var, value):
+        """Bool: word `idx_var` == integer constant `value` (bit-level encoding)."""
+        bits = self._get_bits(idx_var)
+        clauses = []
+        for b, bit_idx in bits:
+            want = (value >> bit_idx) & 1
+            clauses.append(b if want else Not(b))
+        return And(clauses) if clauses else BoolVal(True)
+
     def build_eval_namespace(self):
         """Build a namespace dict for eval()-ing LLM-generated Z3 code.
 
@@ -247,6 +256,8 @@ class PredicateEncoder:
         ns['word_gt'] = self.word_gt
         ns['word_le'] = self.word_le
         ns['word_ge'] = self.word_ge
+
+        ns['idx_eq'] = self.idx_eq
 
         # Direct variable names for 1-bit vars
         for name, bits in self.smap.word_vars.items():
@@ -283,13 +294,21 @@ GOOD (self-sustaining, will propagate):
 Think: for each clause, what transition could violate it? Add conditions that
 rule out that transition. The clause should contain its own "proof sketch".
 
-Output ONLY `hints = [...]`. Use these APIs:
-- bool_var("name") / bit_var("name", idx)
-- word_eq_zero / word_neq_zero / word_eq / word_neq
-- word_lt / word_gt / word_le / word_ge  (unsigned comparison)
-- Z3: And, Or, Not, Implies
+Output ONLY `hints = [...]`. Use these APIs (already provided — DO NOT redefine, DO NOT
+import z3, DO NOT call Bool() yourself):
+- bool_var("name")              # 1-bit var by Verilog name
+- bit_var("name", idx)          # specific bit of a multi-bit var
+- word_eq_zero("name") / word_neq_zero("name")
+- word_eq("a","b") / word_neq("a","b")
+- word_lt / word_gt / word_le / word_ge   # unsigned word comparison, take ("a","b")
+- Z3 logical: And, Or, Not, Implies
 
-1-bit vars can be used directly by name. Do NOT use array slices like var[2:0]."""
+CRITICAL: All var/word helpers take **string** Verilog names, not Z3 expressions.
+1-bit vars can ALSO be referenced directly by their Verilog name as a Python identifier
+(e.g. `held_0`). Do NOT use Verilog slice syntax like `var[2:0]`. For composite signals
+that contain dots/brackets in Verilog (e.g. `h[0]`), pass the whole string to bit_var
+like `bit_var("h[0]", 1)`. Do NOT write any `def`, `import`, or assignment statements
+outside the `hints = [...]` list."""
 
 
 def build_user_prompt(verilog_source, property_desc, symbol_summary):
@@ -354,14 +373,11 @@ class LLMOracle:
         code = _extract_code_block(raw)
         ns = encoder.build_eval_namespace()
 
-        # Try bulk eval first (fast path)
-        try:
-            exec(code, ns)
-            return ns.get('hints', []), raw
-        except Exception:
-            pass
-
-        # Fallback: wrap each hint in try/except via rewritten code
+        # Always extract just the `hints = [...]` list and eval each element
+        # against our namespace. We never `exec` the LLM's preamble — it tends
+        # to redefine helpers (`def bool_var(name): return Bool(name)`) which
+        # silently shadow our encoder and produce uninterpreted Bools that
+        # have no relation to the AIGER latches.
         hints = _eval_hints_individually(code, ns)
         return hints, raw
 
@@ -582,12 +598,8 @@ def load_hints(filepath, encoder):
     ns = encoder.build_eval_namespace()
     code = data["code"]
 
-    # Try bulk eval, fallback to per-hint
-    try:
-        exec(code, ns)
-        hints = ns.get('hints', [])
-    except Exception:
-        hints = _eval_hints_individually(code, ns)
+    # Always per-hint eval (see generate_hints comment).
+    hints = _eval_hints_individually(code, ns)
 
     print(f"  Loaded {len(hints)} hints from {filepath}")
     return hints, data.get("metadata", {})
