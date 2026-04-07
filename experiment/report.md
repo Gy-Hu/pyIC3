@@ -26,9 +26,9 @@ report.
     used by `pyIC3-LLM` to encode word-level predicates
   - `original/<name>.{v,sv}` — Verilog source, used by `pyIC3-LLM`
 - **Drivers**
-  - `experiment/run_baselines.py` — 3 × 16 = 48 jobs, 8-way parallel,
+  - `experiment/sweep.py baseline` — 3 × 16 = 48 jobs, 8-way parallel,
     1800 s timeout, results → `experiment/baseline_results.json`.
-  - `experiment/run_llm.py`       — 12 safety cases, 8-way parallel,
+  - `experiment/sweep.py llm`       — 12 safety cases, 8-way parallel,
     1800 s timeout, results → `experiment/llm_results.json`.
 - **Environment** — `venv/bin/python` (CPython 3.14, Z3 + numpy). Single
   Darwin-arm64 host. Baseline sweep wall = 5403 s (≈ 90 min). LLM sweep wall
@@ -228,33 +228,41 @@ print.
 
 ## Reproducing
 
+All experiment logic lives in a single driver, `experiment/sweep.py`, with
+three subcommands. Each subcommand spawns its workers as fresh subprocesses
+(`python sweep.py worker ...`) so every job has a hard wall timeout.
+
 ```bash
 # Three baselines: mini_ic3, mini_quip, pyIC3 — 3 × 16 = 48 jobs
-venv/bin/python experiment/run_baselines.py
-# -> experiment/baseline_results.json , experiment/baseline_run.log
+venv/bin/python experiment/sweep.py baseline
+# -> experiment/baseline_results.json
 
 # pyIC3-LLM: 12 safety cases
-venv/bin/python experiment/run_llm.py
-# -> experiment/llm_results.json , experiment/llm_run.log
+venv/bin/python experiment/sweep.py llm
+# -> experiment/llm_results.json
+
+# rIC3 oracle cross-check (not part of the report, used for verdict validation)
+venv/bin/python experiment/sweep.py ric3
+# -> experiment/ric3_results.json
 ```
 
-Single-job entry points used by the orchestrators:
+Single-job worker mode (called internally by the orchestrators; also
+useful for ad-hoc debugging):
 
 ```bash
-venv/bin/python experiment/baseline_runner.py {mini_ic3|mini_quip|pyic3} <file>
-venv/bin/python experiment/llm_runner.py <name> <aag> <map> <verilog> [hints_json]
+venv/bin/python experiment/sweep.py worker baseline {mini_ic3|mini_quip|pyic3} <file>
+venv/bin/python experiment/sweep.py worker llm <name> <aag> <map> <verilog> [hints.json]
 ```
 
 `.env` provides `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL`. Setting
-`hints_json` to an existing file skips the live LLM call (cached mode);
+`hints.json` to an existing file skips the live LLM call (cached mode);
 otherwise the LLM is called and the hints are saved to that path.
 
 ## Files
 
-- `experiment/baseline_runner.py`     — single-job runner for the 3 baselines
-- `experiment/run_baselines.py`       — parallel orchestrator (3 × 16 = 48 jobs)
-- `experiment/llm_runner.py`          — single-job runner for pyIC3-LLM
-- `experiment/run_llm.py`             — parallel orchestrator (12 safety cases)
+- `experiment/sweep.py`               — unified driver (subcommands:
+  `baseline`, `llm`, `ric3`, `worker`)
 - `experiment/baseline_results.json`  — baseline (mini_ic3 / mini_quip / pyIC3) data dump
 - `experiment/llm_results.json`       — pyIC3-LLM data dump
-- `experiment/baseline_run.log` / `llm_run.log` — streaming logs
+- `experiment/ric3_results.json`      — rIC3 oracle data dump
+- `experiment/baseline_run.log` / `llm_run.log` / `ric3_run.log` — streaming logs
