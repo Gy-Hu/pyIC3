@@ -338,6 +338,55 @@ GOOD (self-sustaining, will propagate):
 Think: for each clause, what transition could violate it? Add conditions that
 rule out that transition. The clause should contain its own "proof sketch".
 
+# ── INVARIANT TEMPLATE GRAMMAR (SyGuS-style) ─────────────────────────
+Most hardware/protocol benchmarks follow a small set of structural patterns.
+Before writing hints, IDENTIFY which patterns apply and INSTANTIATE these
+templates. Let i, j range over agent indices (typically 0..N-1 with N small).
+
+(T1) ACTIVE→NONZERO   For each agent i with an "active" flag and a value:
+        Implies(active_i, word_neq_zero("val_i"))
+
+(T2) PAIRWISE MUTEX   For all i ≠ j when at most one agent can be active:
+        Implies(active_i, Not(active_j))
+
+(T3) ACTIVE DOMINATES  For all i ≠ j when the active agent must hold the
+                       extremum (max epoch, max priority, etc.):
+        Implies(active_i, word_gt("val_i", "val_j"))
+
+(T4) PAIRWISE DISTINCT  For all i < j when nonzero values must be unique:
+        Implies(And(word_neq_zero("val_i"), word_neq_zero("val_j")),
+                word_neq("val_i", "val_j"))
+
+(T5) CACHED-OR-NULL    For each per-agent shadow register c_i tracking val_i:
+        Or(word_eq_zero("c_i"), word_eq("c_i", "val_i"))
+
+(T6) ACTIVE→ALL-OTHERS-QUIESCENT  For all (i,j) when active agent forbids
+                                  any pending action elsewhere:
+        Implies(active_i, Or(word_eq_zero("pending_j"),
+                             word_le("pending_j", "marker_j")))
+
+(T7) AT-MOST-ONE-LIVE  For all i ≠ j when at most one signal can be "live":
+        Implies(live(x_i), Not(live(x_j)))
+
+(T8) STATE-MACHINE REACHABILITY  Cut impossible (state, posn, counter) tuples:
+        Implies(state_in("STATE_A","STATE_B"), word_le("counter", K))
+        Implies(state_is("STATE_X"), word_ge("posn", 1))
+
+(T9) COUNTER BOUND   For loop counters / item counts with a static upper bound:
+        word_le("counter", K)
+
+(T10) ORDER PROPERTY  For sorted/heap/queue structures, in stable states:
+        Implies(state_is("STABLE"), word_le("h[parent]", "h[child]"))
+
+How to use the templates:
+  1. Read the Verilog. Identify the agent index range (N=2..8 typically) and
+     the per-agent registers vs the shared mediator state.
+  2. Identify the safety property: usually mutex, ordering, bound, or equivalence.
+  3. For EACH applicable template, EMIT EVERY (i,j) instantiation. Do not skip
+     any pair — IC3 needs the full closure to be jointly inductive.
+  4. If state names are listed in the symbol summary's enums, use state_in/state_is
+     with string labels. Otherwise use idx_eq("state", int).
+
 Output ONLY `hints = [...]`. Use these APIs (already provided — DO NOT redefine, DO NOT
 import z3):
 - bool_var("name") / bit_var("name", idx)
